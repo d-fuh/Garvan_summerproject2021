@@ -12,11 +12,11 @@
 ##   (O3) File indicating the average depth
 
 
-## v4.0 (final)
-## Resolved command syntax bug
-## Fixing filename input issue
-## Confirmed wf output syntax correct 
-## Consider filling in missing runtime parameter (optional)
+## v4.3
+## Optimised meandepth command to reduce I/O cost
+## Debugged meandepth cmd in which coverage BAM resulted in disk exhaustion
+## Rewrote meandepth algorithm
+## DiskGB became dynamically programmed
 
 
 # START WORKFLOW
@@ -30,6 +30,7 @@ workflow WF_HeaderMaprateDepth{
 		Int cpu = 1
 		Int memoryGB = 5
 		Int diskGB_boot = 5
+		#Int DiskGB = 2*ceil(size(${input_bam}, "GB") + size(${index_bam}, "GB")) ## new dynamic parameter - need local test
 	}
 
 	call headCaller{
@@ -64,7 +65,7 @@ workflow WF_HeaderMaprateDepth{
 			preemptible=preemptible,
 			cpu=cpu
 	}
-## check the output file format 
+
 	output {
 		File header = headCaller.header
 		File maprate = mapCaller.maprate
@@ -83,6 +84,7 @@ task headCaller{
 		Int diskGB_boot
 		Int cpu
 		Int memoryGB
+		#Int DiskSizeGb
 	}
 
 	command {
@@ -99,7 +101,7 @@ task headCaller{
     	bootDiskSizeGb: diskGB_boot
     	cpu: cpu
     	memory: memoryGB
-
+    	#DiskSizeGb: DiskGB ## new dynamic parameter - need test locale
 	}
 }
 # This task calls the mapping rate from a BAM file by highlighting the "%" chr.
@@ -112,6 +114,7 @@ task mapCaller {
 		Int diskGB_boot
 		Int cpu
 		Int memoryGB
+		#Int DiskSizeGb
 	}
 	
 	command {
@@ -128,7 +131,7 @@ task mapCaller {
     	bootDiskSizeGb: diskGB_boot
     	cpu: cpu
     	memory: memoryGB
-
+    	#DiskSizeGb: DiskGB ## new dynamic parameter - need test locale
 	}
 }
 # This task retrieves the mean depth from a BAM file by means of samtools:coverage.
@@ -141,10 +144,11 @@ task depthCaller {
 		Int diskGB_boot
 		Int cpu
 		Int memoryGB
+		#Int DiskSizeGb
 	}
 	
 	command {
-		samtools coverage ${input_bam} | grep -A1 -w "meandepth" > ${filename}_meandepth.txt
+		samtools coverage -m ${input_bam} > ${filename}_meandepth.txt
 	}
 
 	output {
@@ -157,6 +161,6 @@ task depthCaller {
     	bootDiskSizeGb: diskGB_boot
     	cpu: cpu
     	memory: memoryGB
-
+    	#DiskSizeGb: DiskGB ## new dynamic parameter - need test locale
 	}
 }

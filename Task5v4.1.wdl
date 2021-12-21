@@ -12,9 +12,11 @@
 ##   (O3) File indicating the average depth
 
 
-## v4.1
-## Changed meandepth command to print histogram of available reads
-## Note diskGB >= 10 need be specified and adjusted to workspace capacity
+## v4.3
+## Optimised meandepth command to reduce I/O cost
+## Debugged meandepth cmd in which coverage BAM resulted in disk exhaustion
+## Rewrote meandepth algorithm
+## DiskGB became dynamically programmed
 
 
 # START WORKFLOW
@@ -28,6 +30,7 @@ workflow WF_HeaderMaprateDepth{
 		Int cpu = 1
 		Int memoryGB = 5
 		Int diskGB_boot = 5
+		Int DiskGB = 2*ceil(size(${input_bam}, "GB") + size(${index_bam}, "GB")) ## new dynamic parameter - need local test
 	}
 
 	call headCaller{
@@ -97,7 +100,7 @@ task headCaller{
     	bootDiskSizeGb: diskGB_boot
     	cpu: cpu
     	memory: memoryGB
-
+    	DiskSizeGb: DiskGB ## new dynamic parameter - need test locale
 	}
 }
 # This task calls the mapping rate from a BAM file by highlighting the "%" chr.
@@ -126,7 +129,7 @@ task mapCaller {
     	bootDiskSizeGb: diskGB_boot
     	cpu: cpu
     	memory: memoryGB
-
+    	DiskSizeGb: DiskGB ## new dynamic parameter - need test locale
 	}
 }
 # This task retrieves the mean depth from a BAM file by means of samtools:coverage.
@@ -155,5 +158,6 @@ task depthCaller {
     	bootDiskSizeGb: diskGB_boot
     	cpu: cpu
     	memory: memoryGB
+    	DiskSizeGb: DiskGB ## new dynamic parameter - need test locale
 	}
 }
