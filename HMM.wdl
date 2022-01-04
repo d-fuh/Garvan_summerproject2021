@@ -21,7 +21,6 @@ workflow WF_HeaderMaprateDepth{
 		Int preemptible = 3
 		Int cpu = 1
 		Int memoryGB = 5
-		Int diskGB_boot = 5
 	}
 
 	call headCaller{
@@ -30,7 +29,6 @@ workflow WF_HeaderMaprateDepth{
 			index_bam=index_bam,
 			filename=filename,
 			memoryGB=memoryGB,
-			diskGB_boot=diskGB_boot,
 			preemptible=preemptible,
 			cpu=cpu
 	}
@@ -41,7 +39,6 @@ workflow WF_HeaderMaprateDepth{
 			index_bam=index_bam,
 			filename=filename,
 			memoryGB=memoryGB,
-			diskGB_boot=diskGB_boot,
 			preemptible=preemptible,
 			cpu=cpu
 	}
@@ -52,7 +49,6 @@ workflow WF_HeaderMaprateDepth{
 			index_bam=index_bam,
 			filename=filename,
 			memoryGB=memoryGB,
-			diskGB_boot=diskGB_boot,
 			preemptible=preemptible,
 			cpu=cpu
 	}
@@ -72,10 +68,11 @@ task headCaller{
 		File index_bam
 		String filename
 		Int preemptible
-		Int diskGB_boot
 		Int cpu
 		Int memoryGB
 	}
+
+	Int diskspace = 2*ceil(size(input_bam, “GB”) + size(index_bam, “GB”))
 
 	command {
 		samtools view -H ${input_bam} > ${filename}_header.txt
@@ -88,10 +85,9 @@ task headCaller{
 	runtime {
 		docker: "staphb/samtools:latest"
     	preemptible: preemptible
-    	bootDiskSizeGb: diskGB_boot
+    	bootDiskSizeGb: diskspace
     	cpu: cpu
     	memory: memoryGB
-
 	}
 }
 # This task calls the mapping rate from a BAM file by highlighting the "%" chr.
@@ -101,11 +97,12 @@ task mapCaller {
 		File index_bam
 		String filename
 		Int preemptible
-		Int diskGB_boot
 		Int cpu
 		Int memoryGB
 	}
 	
+	Int diskspace = 2*ceil(size(input_bam, “GB”) + size(index_bam, “GB”))
+
 	command {
 		samtools flagstat ${input_bam} | grep "%" > ${filename}_maprate.txt
 	}
@@ -117,7 +114,7 @@ task mapCaller {
 	runtime {
 		docker: "staphb/samtools:latest"
     	preemptible: preemptible
-    	bootDiskSizeGb: diskGB_boot
+    	bootDiskSizeGb: diskspace
     	cpu: cpu
     	memory: memoryGB
 
@@ -130,11 +127,12 @@ task depthCaller {
 		File index_bam
 		String filename
 		Int preemptible
-		Int diskGB_boot
 		Int cpu
 		Int memoryGB
 	}
 	
+	Int diskspace = 2*ceil(size(input_bam, “GB”) + size(index_bam, “GB”))
+
 	command {
 		samtools coverage -m ${input_bam} > ${filename}_meandepth.txt
 	}
@@ -146,7 +144,7 @@ task depthCaller {
 	runtime {
 		docker: "staphb/samtools:latest"
     	preemptible: preemptible
-    	bootDiskSizeGb: diskGB_boot
+    	bootDiskSizeGb: diskspace
     	cpu: cpu
     	memory: memoryGB
 	}
