@@ -13,7 +13,7 @@
 ## Recovered samtools coverage -m command
 
 version 1.0
-workflow WF_HeaderMaprateDepth{
+workflow HeaderMaprateDepth{
 	input{
 		File input_bam
 		File index_bam
@@ -72,7 +72,7 @@ task headCaller{
 		Int memoryGB
 	}
 
-	Int diskspace = 2*ceil(size(input_bam, “GB”) + size(index_bam, “GB”))
+	Int diskspace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
 
 	command {
 		samtools view -H ${input_bam} > ${filename}_header.txt
@@ -83,7 +83,7 @@ task headCaller{
 	}
 
 	runtime {
-		docker: "staphb/samtools:latest"
+		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
     	bootDiskSizeGb: diskspace
     	cpu: cpu
@@ -101,7 +101,7 @@ task mapCaller {
 		Int memoryGB
 	}
 	
-	Int diskspace = 2*ceil(size(input_bam, “GB”) + size(index_bam, “GB”))
+	Int diskspace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
 
 	command {
 		samtools flagstat ${input_bam} | grep "%" > ${filename}_maprate.txt
@@ -112,7 +112,7 @@ task mapCaller {
 	}
 
 	runtime {
-		docker: "staphb/samtools:latest"
+		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
     	bootDiskSizeGb: diskspace
     	cpu: cpu
@@ -131,7 +131,7 @@ task depthCaller {
 		Int memoryGB
 	}
 	
-	Int diskspace = 2*ceil(size(input_bam, “GB”) + size(index_bam, “GB”))
+	Int diskspace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
 
 	command {
 		samtools coverage -m ${input_bam} > ${filename}_meandepth.txt
@@ -142,7 +142,7 @@ task depthCaller {
 	}
 
 	runtime {
-		docker: "staphb/samtools:latest"
+		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
     	bootDiskSizeGb: diskspace
     	cpu: cpu
