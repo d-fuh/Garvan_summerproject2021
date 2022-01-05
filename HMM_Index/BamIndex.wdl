@@ -4,6 +4,7 @@ task samtoolsSortTask{
     File inputBAM
     String sortedBAM = basename(inputBAM, ".bam") + ".sorted.bam"
     Int diskSpace = 2*ceil(size(inputBAM, "GB"))
+    Int memoryGB
 
     command {
         samtools sort -m 20G -@ 4 -o ${sortedBAM} ${inputBAM} && \
@@ -12,7 +13,7 @@ task samtoolsSortTask{
     runtime {
         docker : "erictdawson/svdocker"
         disks: "local-disk ${diskSpace} HDD"
-        memory : "24 GB"
+        memory : memoryGB
         cpus : 1
         preemptible : 3
     }

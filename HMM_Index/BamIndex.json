@@ -1,4 +1,5 @@
 {
-  "samtoolsSort.inputBAM": "ewsr1_ER019_SAR1_T.bam"
+  "samtoolsSort.inputBAM": "File",
+  "samtoolsSort.samtoolsSortTask.memoryGB": "Int"
 }
 
