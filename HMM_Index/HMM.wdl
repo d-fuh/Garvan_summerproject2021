@@ -9,7 +9,7 @@
 ##   (O3) File indicating the average depth
 
 ## v5.0
-## Fixed diskspace issue
+## Fixed diskSpace issue
 ## Recovered samtools coverage -m command
 
 version 1.0
@@ -20,8 +20,10 @@ workflow HeaderMaprateDepth{
 		String filename
 		Int preemptible = 3
 		Int cpu = 1
-		Int memoryGB = 5
+		Int memoryGB = 8
 	}
+
+	Int diskSpace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
 
 	call headCaller{
 		input:
@@ -30,7 +32,8 @@ workflow HeaderMaprateDepth{
 			filename=filename,
 			memoryGB=memoryGB,
 			preemptible=preemptible,
-			cpu=cpu
+			cpu=cpu,
+			diskSpace=diskSpace
 	}
 
 	call mapCaller{
@@ -40,7 +43,8 @@ workflow HeaderMaprateDepth{
 			filename=filename,
 			memoryGB=memoryGB,
 			preemptible=preemptible,
-			cpu=cpu
+			cpu=cpu,
+			diskSpace=diskSpace
 	}
 
 	call depthCaller{
@@ -50,7 +54,8 @@ workflow HeaderMaprateDepth{
 			filename=filename,
 			memoryGB=memoryGB,
 			preemptible=preemptible,
-			cpu=cpu
+			cpu=cpu,
+			diskSpace=diskSpace
 	}
  
 	output {
@@ -72,7 +77,7 @@ task headCaller{
 		Int memoryGB
 	}
 
-	Int diskspace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
+	Int diskSpace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
 
 	command {
 		samtools view -H ${input_bam} > ${filename}_header.txt
@@ -85,7 +90,7 @@ task headCaller{
 	runtime {
 		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
-    	bootDiskSizeGb: diskspace
+    	disks: "local disk ${diskSpace} HDD"
     	cpu: cpu
     	memory: memoryGB
 	}
@@ -101,7 +106,7 @@ task mapCaller {
 		Int memoryGB
 	}
 	
-	Int diskspace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
+	Int diskSpace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
 
 	command {
 		samtools flagstat ${input_bam} | grep "%" > ${filename}_maprate.txt
@@ -114,7 +119,7 @@ task mapCaller {
 	runtime {
 		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
-    	bootDiskSizeGb: diskspace
+    	disks: "local disk ${diskSpace} HDD"
     	cpu: cpu
     	memory: memoryGB
 
@@ -131,7 +136,7 @@ task depthCaller {
 		Int memoryGB
 	}
 	
-	Int diskspace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
+	Int diskSpace = 2*ceil(size(input_bam, "GB") + size(index_bam, "GB"))
 
 	command {
 		samtools coverage -m ${input_bam} > ${filename}_meandepth.txt
@@ -144,7 +149,7 @@ task depthCaller {
 	runtime {
 		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
-    	bootDiskSizeGb: diskspace
+    	disks: "local disk ${diskSpace} HDD"
     	cpu: cpu
     	memory: memoryGB
 	}
