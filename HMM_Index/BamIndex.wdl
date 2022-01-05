@@ -5,17 +5,19 @@ task samtoolsSortTask{
     String sortedBAM = basename(inputBAM, ".bam") + ".sorted.bam"
     Int diskSpace = 2*ceil(size(inputBAM, "GB"))
     Int memoryGB
-
+    Int cpu
+    Int preemptible
+    
     command {
         samtools sort -m 20G -@ 4 -o ${sortedBAM} ${inputBAM} && \
         samtools index ${sortedBAM}
     }
     runtime {
-        docker : "erictdawson/svdocker"
+        docker: "erictdawson/svdocker"
         disks: "local-disk ${diskSpace} HDD"
-        memory : memoryGB
-        cpus : 1
-        preemptible : 3
+        memory: memoryGB + "GB"
+        cpu: cpu
+        preemptible: preemptible
     }
     output{
         File outputBAM="${sortedBAM}"
