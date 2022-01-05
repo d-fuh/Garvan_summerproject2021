@@ -1,9 +1,9 @@
 {
-  "HeaderMaprateDepth.input_bam": "NIST-hg001-7001-b-ready.bam",
-  "HeaderMaprateDepth.preemptible": "Int (optional, default = 3)",
-  "HeaderMaprateDepth.cpu": "Int (optional, default = 1)",
-  "HeaderMaprateDepth.index_bam": "NIST-hg001-7001-b-ready.bam.bai",
-  "HeaderMaprateDepth.filename": "NIST-hg001-7001-b-ready",
-  "HeaderMaprateDepth.memoryGB": "Int (optional, default = 5)"
+  "HeaderMaprateDepth.input_bam": "dream1.normal.dedup.realigned.fixed.bam.bam",
+  "HeaderMaprateDepth.preemptible": "3",
+  "HeaderMaprateDepth.cpu": "1",
+  "HeaderMaprateDepth.index_bam": "dream1.normal.dedup.realigned.fixed.bam.bai",
+  "HeaderMaprateDepth.filename": "dream1.normal.dedup.realigned.fixed",
+  "HeaderMaprateDepth.memoryGB": "5"
 }
 

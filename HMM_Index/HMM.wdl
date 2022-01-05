@@ -32,8 +32,7 @@ workflow HeaderMaprateDepth{
 			filename=filename,
 			memoryGB=memoryGB,
 			preemptible=preemptible,
-			cpu=cpu,
-			diskSpace=diskSpace
+			cpu=cpu
 	}
 
 	call mapCaller{
@@ -43,8 +42,7 @@ workflow HeaderMaprateDepth{
 			filename=filename,
 			memoryGB=memoryGB,
 			preemptible=preemptible,
-			cpu=cpu,
-			diskSpace=diskSpace
+			cpu=cpu
 	}
 
 	call depthCaller{
@@ -54,8 +52,7 @@ workflow HeaderMaprateDepth{
 			filename=filename,
 			memoryGB=memoryGB,
 			preemptible=preemptible,
-			cpu=cpu,
-			diskSpace=diskSpace
+			cpu=cpu
 	}
  
 	output {
@@ -90,7 +87,7 @@ task headCaller{
 	runtime {
 		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
-    	disks: "local disk ${diskSpace} HDD"
+    	disks: "local-disk ${diskSpace} HDD"
     	cpu: cpu
     	memory: memoryGB
 	}
@@ -119,10 +116,9 @@ task mapCaller {
 	runtime {
 		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
-    	disks: "local disk ${diskSpace} HDD"
+    	disks: "local-disk ${diskSpace} HDD"
     	cpu: cpu
     	memory: memoryGB
-
 	}
 }
 # This task retrieves the mean depth from a BAM file by means of samtools:coverage.
@@ -149,7 +145,7 @@ task depthCaller {
 	runtime {
 		docker: "staphb/samtools:1.14"
     	preemptible: preemptible
-    	disks: "local disk ${diskSpace} HDD"
+    	disks: "local-disk ${diskSpace} HDD"
     	cpu: cpu
     	memory: memoryGB
 	}
