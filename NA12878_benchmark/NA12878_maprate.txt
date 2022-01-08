@@ -1,0 +1,4 @@
+761108738 + 0 mapped (99.04% : N/A)
+749807223 + 0 primary mapped (99.03% : N/A)
+728977005 + 0 properly paired (96.28% : N/A)
+4783739 + 0 singletons (0.63% : N/A)

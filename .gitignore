@@ -1,3 +1,8 @@
+# can also specify using file name wildcard etc
 *.jar
 *.pdf
 *.docx
+*.rdata
+*.vcf.gz
+*.vcf
+*.tsv.gz

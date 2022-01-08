@@ -1,0 +1,376 @@
+---
+title: "VCF R Tutorial"
+output: html_notebook
+---
+This is a vcf tutorial using NA12878_small SV calls.
+
+```{r message=FALSE, include=FALSE}
+library(tidyverse)
+```
+
+# First Example: Analysing the Delly SV caller on small NA12878
+
+Instead of using the raw vcf, it seems like the annotated tsv file contains all the info we need for the following analyses...
+
+Let's first read in the tsv file generated from AnnotSV:
+
+```{r}
+NAsmall.delly <- read_tsv("AnnotSV_NAsmall_delly.tsv", show_col_types = FALSE)
+```
+
+Check the column types issue if required. Otherwise, we can start analysing:
+
+## 1. I want to know about the SV types detected by Delly here
+```{r}
+table(as.factor(NAsmall.delly$SV_type))
+```
+
+We can generate a nice plot of this result by:
+
+```{r}
+# Plot and annotate the SV types detected with sample size
+sample_size = NAsmall.delly %>% group_by(SV_type) %>% summarize(num=n())
+NAsmall.delly %>%
+  left_join(sample_size) %>%
+  mutate(SV_typee = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = SV_typee)) +
+    geom_bar() +
+        # optional: scale_fill_continuous(name = "Sample size (n)", low = "colour1", high = "colour2") +
+    theme_bw() +
+    labs(x="SV type") + theme(aspect.ratio = 12/9) +
+    ggtitle("Types of structural variants detected by Delly \n in small subset of NA12878")
+
+ggsave("SV_type_Delly_NAsmall.png")
+```
+
+## 2. I then want to know about these two variables: "REF" and "FILTER"
+
+Let's review some basic operations we can perform in order to "poke" about a variable (column) in a given dataframe:
+
+(Replace df with df$var when appropriate.)
+
+- summary(df)
+- print(df)
+- view(df)
+- list(df)
+- head(df) && tail(df)
+- plot(df)
+- str(df)
+- dim(df)
+
+```{r}
+str(NAsmall.delly$REF)
+str(NAsmall.delly$FILTER)
+```
+
+```{r eval=FALSE}
+#list(NAsmall.delly$REF)
+view(NAsmall.delly$REF)
+```
+
+Of course, none of the above were what we're looking for. What we're looking for is:
+
+```{r}
+levels(as.factor(NAsmall.delly$REF))
+```
+
+Bravo. We now do similarly:
+
+```{r}
+levels(as.factor(NAsmall.delly$FILTER))
+```
+
+Now we want to see *how many* of recordings are in each category presented. This can be done via:
+
+```{r}
+table(as.factor(NAsmall.delly$REF))
+plot(as.factor(NAsmall.delly$REF))
+
+plot(as.factor(NAsmall.delly$ALT))
+table(as.factor(NAsmall.delly$ALT))
+
+## for comparison
+plot(as.factor(NAsmall.delly$SV_type))
+table(as.factor(NAsmall.delly$SV_type))
+```
+
+Somehow it looks like "ALT" == "SV_type". Why?
+
+> They're not really the same. Usually "ALT" shows the altered base whereas REF refers to the reference. In this case the SV caller only reported the types of SV found in this dataset: Deletion, duplication, and inversion --- None of which can be expressed as a single-base ref-alt substitution. Therefore, if you don't have SNV in the file, ALT only shows the type of SV investigated.
+
+
+Another important feature of a call is its quality: This is filtered by ...?
+```{r}
+table(as.factor(NAsmall.delly$FILTER))
+plot(as.factor(NAsmall.delly$FILTER))
+```
+
+We noticed that n(LowQual) > n(PASS). Is this normal?
+
+
+What else can we learn about this dataset?
+
+## 3. Learning more about the variables from the annot file
+
+```{r}
+levels(as.factor(NAsmall.delly$SV_chrom))
+plot(as.factor(NAsmall.delly$SV_chrom))
+plot(as_factor(NAsmall.delly$SV_chrom)) # for comparison
+```
+
+In the AnnotSV file, "Location2" stands for its topology relevant to the gene. Let's have a look at its distribution in this dataset: 
+
+```{r}
+table(as.factor(NAsmall.delly$Location2))
+plot(as.factor(NAsmall.delly$Location2))
+```
+
+This one is interesting enough to create a nice histogram for:
+```{r}
+sample_size = NAsmall.delly %>% group_by(Location2) %>% summarize(num=n())
+NAsmall.delly %>%
+  left_join(sample_size) %>%
+  mutate(Topology = paste0(Location2, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = Topology)) +
+    geom_bar() +
+        # optional: scale_fill_continuous(name = "Sample size (n)", low = "colour1", high = "colour2") +
+    theme_bw() +
+    labs(x="Gene Topology") + #theme(aspect.ratio = 12/9) +
+    ggtitle("Topology of structural variants detected by Delly in a small subset of NA12878")
+
+ggsave("SV_topos_Delly_NAsmall.png")
+```
+
+
+
+
+```{r}
+levels(as.factor(NAsmall.delly$SV_length))
+plot(as.factor(NAsmall.delly$SV_length))
+```
+
+Formidable. In fact, for length/address/*range*-related variables, we will explore more in the later section with r/GenomicRanges.
+
+Let's look at other variables:
+
+```{r}
+levels(as.factor(NAsmall.delly$Annotation_mode))
+table(as.factor(NAsmall.delly$Annotation_mode))
+plot(as.factor(NAsmall.delly$Annotation_mode))
+```
+
+```{r}
+levels(as.factor(NAsmall.delly$AnnotSV_ranking_score))
+plot(as.factor(NAsmall.delly$AnnotSV_ranking_criteria)) # complex variable to only read
+plot(as.factor(NAsmall.delly$AnnotSV_ranking_score))
+```
+
+
+```{r}
+levels(as.factor(NAsmall.delly$Frameshift))
+table(as.factor(NAsmall.delly$Frameshift))
+plot(as.factor(NAsmall.delly$Frameshift))
+```
+
+
+```{r}
+levels(as.factor(NAsmall.delly$Exon_count))
+plot(as.factor(NAsmall.delly$Exon_count))
+```
+
+
+```{r}
+levels(as.factor(NAsmall.delly$GC_content_left))
+plot(as.factor(NAsmall.delly$GC_content_left))
+
+levels(as.factor(NAsmall.delly$GC_content_right))
+plot(as.factor(NAsmall.delly$GC_content_right))
+```
+
+```{r}
+# get median of a continuous variable
+mean(as.numeric(NAsmall.delly$GC_content_left))
+median(as.numeric(NAsmall.delly$GC_content_right))
+```
+
+
+
+
+
+
+
+
+```{r}
+levels(as.factor(NAsmall.delly$ACMG))
+table(as.factor(NAsmall.delly$ACMG))
+```
+
+What does **ACMG** stand for?
+
+> The American College of Medical Genetics and Genomics and the Association for Molecular Pathology (ACMG-AMP) system for variant classification is score based with five classes: benign, likely benign, variant of unknown significance (VUS), likely pathogenic, and pathogenic.
+
+So, if we can find the 132 entries classified as ACMG, can we also obtain info on its potential pathogenicity?
+
+```{r}
+# a[!is.na(a)]
+NAsmall.delly$ID[!is.na(NAsmall.delly$ACMG)]
+```
+
+```{r}
+NAsmall.delly$CytoBand[!is.na(NAsmall.delly$ACMG)]
+```
+
+
+```{r}
+NAsmall.delly$Gene_name[!is.na(NAsmall.delly$ACMG)]
+```
+
+It's not very easy to read when you have 132 entries in display. Let's pair them up:
+
+```{r}
+c(NAsmall.delly$ID, NAsmall.delly$CytoBand, NAsmall.delly$Gene_name)[!is.na(NAsmall.delly$ACMG)]
+```
+
+This is worse! You know what, let's put them into an ordered table instead...
+
+```{r}
+# Designing vectors to hold columns
+ID <- vector(mode = "character", length = 132)
+CytoBand <- vector(mode = "character", length = 132)
+GeneName <- vector(mode = "character", length = 132)
+
+# Combining the vectors to form a raw table
+ACMG.profile <- data.frame(ID, CytoBand, GeneName)
+view(ACMG.profile)
+
+# Inputting the values from Annot 
+## Do we need loops here?
+ACMG.profile$ID <- NAsmall.delly$ID[!is.na(NAsmall.delly$ACMG)]
+ACMG.profile$CytoBand <- NAsmall.delly$CytoBand[!is.na(NAsmall.delly$ACMG)]
+ACMG.profile$GeneName <- NAsmall.delly$Gene_name[!is.na(NAsmall.delly$ACMG)]
+
+# Cleaning the table to form a proper data frame
+view(ACMG.profile)
+```
+
+This is getting more interesting. We want to add more columns to know these particular variants better...
+
+```{r}
+# Now we have a basis, can just insert new column into the df as output/input
+ACMG.profile$Topology <- NAsmall.delly$Location2[!is.na(NAsmall.delly$ACMG)]
+ACMG.profile$n_Exon <- NAsmall.delly$Exon_count[!is.na(NAsmall.delly$ACMG)]
+ACMG.profile$Frameshift <- NAsmall.delly$Frameshift[!is.na(NAsmall.delly$ACMG)]
+```
+
+
+```{r}
+ACMG.profile$Overlapped_CDS_length <- NAsmall.delly$Overlapped_CDS_length[!is.na(NAsmall.delly$ACMG)]
+ACMG.profile$Overlapped_CDS_percent <- NAsmall.delly$Overlapped_CDS_percent[!is.na(NAsmall.delly$ACMG)]
+```
+
+
+```{r}
+ACMG.profile$Chrom <- NAsmall.delly$SV_chrom[!is.na(NAsmall.delly$ACMG)]
+ACMG.profile$SV_length <- NAsmall.delly$SV_length[!is.na(NAsmall.delly$ACMG)]
+ACMG.profile$Quality <- NAsmall.delly$QUAL[!is.na(NAsmall.delly$ACMG)]
+ACMG.profile$Filter <- NAsmall.delly$FILTER[!is.na(NAsmall.delly$ACMG)]
+```
+
+
+```{r}
+view(ACMG.profile)
+```
+
+### Let's learn more about the ACMG variants...
+
+```{r}
+ACMG.pass <- filter(ACMG.profile, Filter == "PASS")
+view(ACMG.pass)
+```
+
+```{r}
+#plot(ACMG.pass$n_Exon)
+hist(ACMG.pass$n_Exon)
+```
+
+```{r}
+hist(ACMG.pass$Overlapped_CDS_length)
+```
+
+```{r}
+ACMG.good <- subset(ACMG.pass, GeneName != "CACNA1S")
+view(ACMG.good)
+```
+
+```{r}
+hist(ACMG.good$n_Exon)
+hist(ACMG.good$Overlapped_CDS_length)
+```
+
+
+```{r}
+table(as.factor(NAsmall.delly$HI))
+plot(as.factor(NAsmall.delly$HI))
+```
+
+As it turns out...we don't need to plot everything to know how many samples are in which category of a variable. We can simply use:
+```{r}
+table(as.factor(NAsmall.delly$SV_type))
+```
+
+## 4. VCF Metrics
+
+    GT 
+
+> The genotype of this sample which for a diploid genome is encoded with a 0 for the REF allele, 1 for the first ALT allele, 2 for the second and so on. 
+
+So 0/0 means homozygous reference, 0/1 is heterozygous, and 1/1 is homozygous for the alternate allele. For a diploid organism, the GT field indicates the two alleles carried by the sample, encoded by a 0 for the REF allele, 1 for the first ALT allele, 2 for the second ALT allele, etc.
+
+    PL	
+
+> the likelihoods of the given genotypes
+
+    GQ	
+
+> the Phred-scaled confidence for the genotype
+
+    AD, DP
+    
+> the depth per allele by sample and coverage
+
+```{r}
+levels(as.factor(NAsmall.delly$FORMAT))
+head(NAsmall.delly$NA12878_small, n=2)
+```
+
+
+# The Benchmarking: Comparing all callers
+
+We will attempt this task in a separate rmd. For now, let's look at what we need and what we're aiming for:
+
+## 1. Number of detected variants
+## 2. Types of detected variants
+
+Can do both at once with stacked bar plot.?
+
+
+## 3. Number of detected variants with XX number of supporting reads
+
+Define "**supporting reads**":
+
+
+## 4. Number of variants detected by all methods
+
+Need to combine all annot files into one big tsv. Then analyse.
+
+
+## 5. Detected variants affecting coding regions or ACMG class of variants
+
+What is **ACMG**? See table (tsv) + reading
+
+
+## 6. Precision, recall, FScore using the consensus SV list from NA12878
+
+We need to find the **consensus list** first:

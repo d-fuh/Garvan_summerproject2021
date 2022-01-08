@@ -1,0 +1,561 @@
+---
+title: "Benchmarking SV callers from VCF Annot files"
+output: html_notebook
+---
+
+In this document, we will benchmark 5 SV callers (Delly, Manta, MELT, Wham, Svaba) generated from the workflow GATKsv and SvABA on the small NA12878 subset.
+
+```{r message=FALSE, include=FALSE}
+library(tidyverse)
+```
+
+# 1. Read in the AnnotSV files and joining into a big master file
+
+```{r}
+NAsmall.delly <- read_tsv("AnnotSV_NAsmall_delly.tsv", show_col_types = FALSE)
+NAsmall.manta <- read_tsv("AnnotSV_NAsmall_manta.tsv", show_col_types = FALSE)
+NAsmall.melt <- read_tsv("AnnotSV_NAsmall_melt.tsv", show_col_types = FALSE)
+NAsmall.wham <- read_tsv("AnnotSV_NAsmall_wham.tsv", show_col_types = FALSE)
+
+NAsmall.svaba.indel <- read_tsv("AnnotSV_NAsmall_svaba_indel.tsv", show_col_types = FALSE)
+NAsmall.svaba.sv <- read_tsv("AnnotSV_NAsmall_svaba_sv.tsv", show_col_types = FALSE)
+```
+
+First, we need to mark each entry with their respective callers:
+```{r}
+dim(NAsmall.delly)
+dim(NAsmall.manta)
+dim(NAsmall.melt)
+dim(NAsmall.wham)
+
+dim(NAsmall.svaba.indel)
+dim(NAsmall.svaba.sv)
+```
+
+Same variables (presumably with equal sizes), very different numbers of entries.
+
+```{r}
+# Do we need loops here?
+NAsmall.delly$Caller <- "Delly"
+NAsmall.manta$Caller <- "Manta"
+NAsmall.melt$Caller <- "Melt"
+NAsmall.wham$Caller <- "Wham"
+
+NAsmall.svaba.indel$Caller <- "Svaba"
+NAsmall.svaba.sv$Caller <- "Svaba"
+```
+
+```{r}
+view(NAsmall.svaba.sv$Caller) # checks out
+```
+
+After creating the caller index for each dataset, we can now join these caller sets into a big, master file, called NAsmall.benchmark:
+```{r message=FALSE}
+# Merge() only takes two dfs (binary op). We need pipe:
+library(plyr)
+
+join(NAsmall.delly, NAsmall.manta, type = "full") %>%
+ join(NAsmall.melt, type = "full") %>%
+  join(NAsmall.wham, type = "full") %>%
+   join(NAsmall.svaba.indel, type = "full") %>%
+    join(NAsmall.svaba.sv, type = "full") -> NAsmall.benchmark
+```
+
+Beware of the difference between plyr::join() and dplyr::merge...
+
+```{r message=FALSE, eval=FALSE}
+join(NAsmall.melt, NAsmall.manta, type = "full") -> NAsmall.mertest
+dim(NAsmall.melt) + dim(NAsmall.manta) # checking dim sums
+dim(NAsmall.mertest)
+```
+
+```{r echo=FALSE}
+# Double checking the merged data frame before we proceed
+dim.sum <- dim(NAsmall.delly) + dim(NAsmall.manta) + dim(NAsmall.melt) + dim(NAsmall.wham) +
+  dim(NAsmall.svaba.indel) + dim(NAsmall.svaba.sv)
+
+dim.bench <- dim(NAsmall.benchmark)
+
+dim.sum # sum of dimensions of all data frame combined
+dim.bench # benchmark df dimension
+
+dim.sum[2]/6 # are n_columns uniform?
+dim.bench[2] # why is there an extra column? which one is it?
+```
+
+```{r}
+col.bench <- colnames(NAsmall.benchmark)
+col.delly <- colnames(NAsmall.delly)
+```
+
+
+```{r eval=FALSE}
+is.na(col.bench) # the additional col 107 is problematic; missing value in col.others[107] == na
+#is.na(col.delly)
+```
+
+
+```{r}
+for (i in 1:107) {
+    print(c(i, col.bench[i], col.delly[i]))[col.bench[i] != col.delly[i]]
+}
+```
+
+To address this:
+
+```{r}
+NAsmall.benchmark[107] <- NULL
+dim(NAsmall.benchmark)
+```
+
+We can now begin analysing our data.
+
+
+# 2. Answering the Questions
+
+## 2-1. Number and Types of variants detected by each method
+
+```{r message=FALSE}
+#detach("package:plyr", unload = TRUE)
+
+sample_size = NAsmall.benchmark %>% group_by(SV_type) %>% summarize(num=n())
+
+NAsmall.benchmark %>%
+  left_join(sample_size) %>%
+  mutate(SV_Type = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = SV_Type, fill=Caller)) +
+    geom_bar() + scale_y_log10() +
+    theme_bw() +
+    labs(x="Type of SV", y="log count") +
+    ggtitle("Types of structural variants detected by different callers \n in a small subset of NA12878")
+
+#ggsave("SV_type_benchmark_NAsmall.png")
+```
+
+## 2-2. Number of variants detected by all methods
+
+This one is trickier than it seems. It is actually asking:
+
+> When intersecting all caller datasets, which SVs were detected by all methods?
+
+In other words, we need to find the **SV locations** (or other universal feature) that were identically detected in every caller tested. Then, we need n(such SVs).
+
+The idea is:
+
+    for(SV_start = SV_start && SV_end = SV_end)
+          test_if (Caller1 != Caller2)
+              if_so { 
+                  keep testing until "Caller1 != any other callers" is TRUE; 
+              }
+          else{
+              next;
+          }
+
+...to search for every identical SVs detected by all callers.
+
+Is there a more efficient & easier-to-program way?
+
+    "intersect"(NAsmall.caller1, NAsmall.caller2, by = "some_way_to_track_SV_ID") %>%
+      intersect(., NAsmall.caller3) %>%
+          ...
+          
+            intersect(, NAsmall.caller_n) -> variant.captured.by.all
+            
+            
+    dim(variant.captured.by.all)
+
+
+In fact, using this method, we can do more with the resultant data frame ("variant.captured.by.all")...
+
+
+### 2-2-1. Using subset() to frame and filter the set "variant.captured.by.all"
+
+Let's subset(SV_start, SV_end, ID, Caller) from the master file:
+
+```{r}
+for.common.var <- subset(NAsmall.benchmark, select = c("SV_start", "SV_end", "SV_type", "ID", "Caller")) 
+view(for.common.var)
+```
+
+Somehow, "ID" must be included for the Caller name to be displayed correctly.
+
+> Must the ID be the same for those SVs who share the same location (i.e. same SV) and called by different callers?
+(i.e. Is ID based on caller, or location?)
+
+NOPE. For example, both Manta and Svaba caught this variant:
+
+| row   | SV_start      | SV_end       | ID                       | Caller     |
+|-------|---------------|:------------:|-------------------------:|:----------:|
+| 36803 | 34889369      | 34889502     | MantaDEL:3561:0:0:0:0:0  | Manta      |
+| 40532 | 34889369      | 34889502     | 881414213                | Svaba      |
+
+
+```{r eval=FALSE}
+length(unique(NAsmall.benchmark$SV_start)) == nrow(NAsmall.benchmark)
+```
+...meaning there are (multiple, in fact) duplicates for the SV_start (and SV_end) columns...
+
+> Note: What does the following dup-removal step do? Does it simply remove duplicates, or, that it removes different (massive subset!) variants called? (Primarily by Delly for some reason...)
+
+    
+    You might want to skip the dup-cleaning step as it removes different variants (a lot of...) that were encompassed by the         large SV_start/end range (Hence not a good/unique marker).
+
+
+```{r}
+for.common.var.cleaned <- aggregate(for.common.var[5], for.common.var[-5], unique) # clean dup
+```
+
+```{r}
+for.common.var.cleaned$ID <- NULL # remove the ID col
+#common.variants2 <- aggregate(for.common.var.cleaned[4], for.common.var.cleaned[-4], unique) # callers unite; originally =3
+```
+
+```{r}
+# preferred version
+common.variants <- aggregate(for.common.var.cleaned[4], for.common.var.cleaned[-4], 
+                             FUN = function(X) paste(unique(X), collapse=", "))
+```
+
+Why is this not working after the update "ID" -> "SV_type"?
+
+```{r}
+str(common.variants$Caller)
+```
+
+
+Now we just need to find those in Caller that have every caller present...
+```{r}
+# first we test
+# grep(c("Svaba", "Manta"), common.variants$Caller) doesn't work because grep() doesn't take vectors with |v| > 1
+grep("Svaba, Manta", common.variants$Caller)
+```
+
+Now we can proceed:
+```{r}
+grep("Svaba, Manta, Delly, Melt, Wham", common.variants$Caller)
+```
+
+To see first whether there is any entry at all that were captured by all callers, we use the old trick:
+
+```{r}
+table(as.factor(common.variants$Caller))
+```
+
+...and to summarise:
+```{r message=FALSE}
+sample_size = common.variants %>% group_by(Caller) %>% summarize(num=n())
+
+common.variants %>%
+  left_join(sample_size) %>%
+  mutate(caller = paste0(Caller, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = caller, fill=SV_type)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="SV Caller", y="count") +
+    ggtitle("Number of structural variants detected by each caller \n (or a combination of) in a small subset of NA12878")
+
+#ggsave("n_and_type_of_SV_by_caller_NAsmall.png")
+```
+
+
+
+## 2-3. Detected variants affecting coding regions (CDS) or ACMG class of variants
+
+### 2-3-1. Data clean-up
+
+```{r}
+Bench.profile <- subset(NAsmall.benchmark, select = c("AnnotSV_ID", "SV_chrom", "SV_length", "SV_type", "ID", "FILTER", "NA12878_small", "Annotation_mode", "CytoBand", "Gene_name", "Gene_count", "ACMG_class", "GenCC_disease", "GenCC_moi", "GenCC_classification", "Caller")) #Bring Location2 and rename next
+```
+
+When we are more familiar with the file format later, we may use select(df, -deselect_var) instead.
+
+```{r}
+table(as.factor(Bench.profile$FILTER)) # QC to remove lowQUAL entries
+```
+
+We only want the PASS ones? So:
+```{r}
+Bench.cleaned <- filter(Bench.profile, FILTER == "PASS")
+```
+
+We can now focus on this dataset.
+
+```{r}
+table(as.factor(Bench.cleaned$ACMG_class))
+table(as.factor(Bench.cleaned$SV_type))
+table(as.factor(Bench.cleaned$SV_chrom))
+table(as.factor(Bench.cleaned$Caller))
+```
+
+### 2-3-2. Variants detected of ACMG class
+
+Recall that ACMG classified variants into 5 major classes:
+
+    - Class 1. Benign
+    
+    - Class 2. Likely benign
+    
+    - Class 3. "VUS" == "Variants of Unknown Significance"
+    
+    - Class 4. Likely pathogenic
+    
+    - Class 5. Pathogenic
+
+We will now analyse our filtered dataset to see how many of them belong to which ACMG class, and, where supplied, what the variant is known to relate to and what they have on their profile.
+
+First, we noticed there are a lot of NA rows in the ACMG_class column. We need to remove them:
+
+Also: full=1 vs 1?
+
+Does it have to do with annotation mode? (Full=full SV classified => annotation_mode must be "split"?)
+
+
+```{r message=FALSE}
+sample_size = Bench.cleaned %>% group_by(ACMG_class) %>% summarize(num=n())
+
+Bench.cleaned %>%
+  left_join(sample_size) %>%
+  mutate(ACMG.class = paste0(ACMG_class, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = ACMG.class, fill=SV_type)) + # can try fill=Caller next
+    geom_bar() +
+    theme_bw() +
+    labs(x="ACMG class", y="count") +
+    ggtitle("ACMG class and SV type detected by various callers \n in a small subset of NA12878")
+
+#ggsave("n_and_type_of_SV_by_caller_NAsmall.png")
+```
+
+Interestingly:
+
+    - Most INV types have NA class;
+    - Of those non-NA class variants, full=5 are almost equally between DEL/DUP;
+    - Comparatively very few variants of class...wait. Let's remove the NA rows and log-y if necessary first...
+    
+```{r}
+Bench.ACMG <- filter(Bench.cleaned, ACMG_class != c("full=NA", "NA"))
+Bench.ACMG <- filter(Bench.cleaned, ACMG_class != "full=NA")
+```
+```{r message=FALSE}
+sample_size = Bench.ACMG %>% group_by(ACMG_class) %>% summarize(num=n())
+
+Bench.ACMG %>%
+  left_join(sample_size) %>%
+  mutate(ACMG.class = paste0(ACMG_class, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = ACMG.class, fill=SV_type)) + # can try fill=Caller next
+    geom_bar() +
+    theme_bw() +
+    labs(x="ACMG class", y="count") +
+    ggtitle("ACMG class and SV type detected by various callers \n in a small subset of NA12878")
+```
+
+Remarkably --- it's just DEL/DUP now!
+
+I want to know that of those displaying full=x, are they due to annotation_mode and is somewhat unnecessary to set apart them from normal "1,3,5"'s.
+
+```{r}
+sample_size = Bench.ACMG %>% group_by(ACMG_class) %>% summarize(num=n())
+
+Bench.ACMG %>%
+  left_join(sample_size) %>%
+  mutate(ACMG.class = paste0(ACMG_class, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = ACMG.class, fill=Annotation_mode)) + # can try fill=Caller next
+    geom_bar() +
+    theme_bw() +
+    labs(x="ACMG class", y="count") +
+    ggtitle("ACMG class and annotation mode relationship")
+```
+
+Indeed (!) --- the "full" was only to signify that the entire SV (which was "split" into genes during annotation) were considered of ACMG class {1,3,5}. This means that if we were only concerned with the severity of the SV, we do not necessarily need to know whether they are "full" or not (It doesn't give more info as no "mixed state" SVs are present at all in this dataset).
+
+We proceed to combine the two classes.
+
+```{r}
+Bench.ACMG[Bench.ACMG == "full=1"] <- "1"
+Bench.ACMG[Bench.ACMG == "full=3"] <- "3"
+Bench.ACMG[Bench.ACMG == "full=5"] <- "5"
+```
+
+```{r message=FALSE}
+sample_size = Bench.ACMG %>% group_by(ACMG_class) %>% summarize(num=n())
+
+Bench.ACMG %>%
+  left_join(sample_size) %>%
+  mutate(ACMG.class = paste0(ACMG_class, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = ACMG.class, fill=SV_type)) + # can try fill=Caller next
+    geom_bar() +
+    theme_bw() +
+    labs(x="ACMG class", y="count") +
+    ggtitle("ACMG class and SV type detected by various callers in a small subset \n of NA12878")
+
+ggsave("ACMG_class_SV_type_benchmark_NAsmall.png")
+```
+
+
+### 2-3-3. Variants affecting CDS
+
+```{r}
+table(as.factor(NAsmall.benchmark$Location2))
+```
+
+> Does 5'UTR-3'UTR mean the SV spans from upstream-CDS, across the CDS, and encompasses the 3'UTR?
+
+If so, then the "variants affecting CDS" include:
+
+    - Those that have Location2 == "CDS";
+    - Those that have Location2 == c("5'UTR-CDS", "CDS-3'UTR");
+    - Those that have Location2 == "5'UTR-3'UTR"
+    
+    [******|------5'UTR------|---------------CDS--------------|-----3'UTR-----|*****]
+
+We noticed that we didn't import the "Location2" (Gene topology) column into the Bench.profile data frame. Let's do that:
+
+```{r}
+Bench.profile$Gene_topology <- NAsmall.benchmark$Location2 # import the raw Location2 col into raw subset profile
+Bench.cleaned <- filter(Bench.profile, FILTER == "PASS") # filter PASS
+```
+
+Let's see:
+```{r}
+table(as.factor(Bench.cleaned$Gene_topology))
+table(as.factor(Bench.cleaned$FILTER)) ## double checking
+```
+
+Now, we filter all those variants that affect CDS and store them in a new df:
+```{r eval=FALSE}
+Bench.CDS <- subset(Bench.cleaned, Gene_topology == c("CDS", "5'UTR-CDS", "CDS-3'UTR", "5'UTR-3'UTR"))
+```
+
+There are several things interesting about this data set that we want to know, since it affects the CDS region.
+
+First:
+```{r eval=FALSE}
+table(as.factor(Bench.CDS$Gene_topology))
+```
+
+We notice the data frame was truncated. This is due to a mis-use of the "==" operator. See https://stackoverflow.com/questions/25647470/filter-multiple-values-on-a-string-column-in-dplyr.
+
+In short, what we need was
+```{r}
+Bench.CDS <- filter(Bench.cleaned, Gene_topology %in% c("CDS", "5'UTR-CDS", "CDS-3'UTR", "5'UTR-3'UTR"))
+```
+```{r}
+table(as.factor(Bench.CDS$Gene_topology))
+```
+
+Let's get cracking.
+
+```{r message=FALSE}
+sample_size = Bench.CDS %>% group_by(Gene_topology) %>% summarize(num=n())
+
+Bench.CDS %>%
+  left_join(sample_size) %>%
+  mutate(Topos = paste0(Gene_topology, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = Topos, fill=SV_type)) + # can try fill=Caller, Gene_name, GenCC... next
+    geom_bar() + scale_y_log10() +
+    theme_bw() +
+    labs(x="Gene topology", y="log count") +
+    ggtitle("CDS-affecting SV type and their topology detected by various callers \n in a small subset of NA12878")
+
+ggsave("CDS_SV_type_benchmark_NAsmall.png")
+```
+
+From here on, I want to create a profile for those SVs detected that specifically affect CDS (including 5'UTR-3'UTR).
+```{r}
+subset(Bench.CDS, select = c("SV_chrom", "CytoBand", "Gene_name", "ACMG_class", "GenCC_disease", "GenCC_moi", "GenCC_classification", "Caller", "Gene_topology")) %>%
+  filter(., Gene_topology %in% c("CDS", "5'UTR-3'UTR")) -> Bench.CDS.profile
+```
+
+I am interested in the following:
+
+    - 1. I want to know if the majority, if not all, of those SVs classified as "5'UTR-3'UTR" were detected by Delly?
+    
+    - 2. I want to see of those SVs detected that has documentation on GenCC AND has non-trivial classification, what the genes affected are, their MOI, and the classification details.
+    
+    - 3. (Continued from 2) I also want to know who called those SVs as an overview.
+
+### 2-3-4. Answering more questions from our CDS-SV profile
+
+#### 2-3-4-1. The first Q 
+
+... can be answered with a bar plot:
+```{r}
+# first, have an estimate
+table(as.factor(Bench.CDS.profile$Caller))
+table(as.factor(Bench.CDS.profile$Gene_topology))
+```
+
+```{r message=FALSE}
+sample_size = Bench.CDS.profile %>% group_by(Gene_topology) %>% summarize(num=n())
+
+Bench.CDS.profile %>%
+  left_join(sample_size) %>%
+  mutate(Topos = paste0(Gene_topology, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = Topos, fill=Caller)) + 
+    geom_bar() + #scale_y_log10() +
+    theme_bw() +
+    labs(x="Gene topology", y="count") +
+    ggtitle("Are most 5'UTR-3'UTR calls made by Delly?")
+```
+
+Interestingly --- not quite!
+
+#### 2-3-4-2. The second Q 
+
+> Of those SVs detected that has documentation on GenCC AND has non-trivial classification, 
+
+
+    - What are the affected genes? 
+    - What are their MOI?
+    - What are their classification details?
+    
+    
+```{r}
+filter(Bench.CDS.profile, !is.na(GenCC_classification) == TRUE) %>%
+  filter(., GenCC_classification != "Limited") -> Bench.CDS.elite
+```
+
+
+The genes, MOI, and classification details, are all in the resultant data frame.
+
+```{r}
+write_csv(Bench.CDS.elite, "CDS_SV_elite_set.csv")
+```
+
+
+#### 2-3-4-3. The third Q
+
+```{r}
+table(as.factor(Bench.CDS.elite$Caller))
+table(as.factor(Bench.cleaned$Caller)) # as a basis comparison
+```
+
+Potentially, we could do a crude rate analysis answering:
+
+> "What is the approximate rate of this caller calling a significant SV?"
+
+and by "significant", we mean that the caller must pass the filter tests and belong to the elite set.
+
+The tests were:
+
+    - (1) FILTER == "PASS";
+    - (2) Affect CDS (via Location2 or equivalently, Gene_topology)
+    - (3) Has significant entry in GenCC;
+    - (4) (Omittible) Affect either only CDS or the entirety of 5'UTR-3'UTR.
+
+
+# 3. Questions we can't (?) answer yet using just the AnnotSV files
+
+There are two remaining questions that seem a bit more complicated:
+
+    Q5. What is the number of detected variants with XX number of "supporting reads"?
+    Q6. What is the (a) Precision, (b) Recall, and (c) F Score of ..., using the "consensus list" of NA12878?
+
+To answer these questions we need to do a bit of read & search, and of course, I think, to start in a new notebook (as we might require vcfR and GenomicRanges...).
