@@ -6,3 +6,4 @@
 *.vcf.gz
 *.vcf
 *.tsv.gz
+*.DS_Store  ## MacOS product
