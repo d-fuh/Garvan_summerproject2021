@@ -8,3 +8,9 @@
 *.tsv.gz
 *.DS_Store  ## MacOS product
 AnnotSV_*.html  ## AnnotSV VCF visualisation file
+NA12878_benchmark/AnnotSV_vis_NA12878_manta.html
+NA12878_benchmark/AnnotSV_vis_NA12878_melt.html
+NA12878_benchmark/AnnotSV_vis_NA12878_wham.html
+NA12878_benchmark/AnnotSV_vis_NA12878_manta.html
+NA12878_benchmark/AnnotSV_vis_NA12878_melt.html
+NA12878_benchmark/AnnotSV_vis_NA12878_wham.html
