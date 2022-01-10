@@ -17,7 +17,7 @@ Filtering and processing notes:
     1) The data ("callers") have been filtered by selecting only the "PASS" callers; and
     2) No info of supporting reads are used as of 1st Edition.
 
-# 1. Data loading and processing
+# 1. Data loading and processing: Benchmark.master
 ```{r}
 library(tidyverse)
 library(vcfR)
@@ -87,6 +87,8 @@ As expected, the "ALT" column contains not only SV_type info for larger variants
 
 This is problematic and for any meaningful analysis to be carried out, we need to annotate the file.
 
+## 2-1. Benchmark.bed (Pseudo-BED file using a PapenfussLab workflow)
+
 ```{r}
 # From Papenfuss lab 
 # https://github.com/PapenfussLab/gridss/blob/master/example/somatic-fusion-gene-candidates.R
@@ -130,7 +132,7 @@ simpleEventType <- function(gr) {
 
 ```{r}
 # using manta calls as example
-vcf <- readVcf("NA12878.delly.vcf")
+vcf <- readVcf("NA12878.wham.vcf")
 info(header(vcf)) = unique(as(rbind(as.data.frame(info(header(vcf))), data.frame(
 	row.names=c("SIMPLE_TYPE"),
 	Number=c("1"),
@@ -140,8 +142,8 @@ gr <- breakpointRanges(vcf)
 svtype <- simpleEventType(gr)
 info(vcf)$SIMPLE_TYPE <- NA_character_
 info(vcf[gr$sourceId])$SIMPLE_TYPE <- svtype
-              # info(vcf[gr$sourceId])$SVLEN <- gr$svLen  -- What does this line do?
-## writeVcf(vcf, "chr12.1527326.DEL1024.sv.annotated.vcf") 
+info(vcf[gr$sourceId])$SVLEN <- gr$svLen ## svLen == "svLeng" and stores the length of the SVs
+writeVcf(vcf, "NA12878.wham.annot.vcf") 
 
 # TODO: perform event filtering here
 # By default, GRIDSS is very sensitive but this comes at the cost of a high false discovery rate
@@ -222,6 +224,106 @@ names(benchmark.bed)[names(benchmark.bed) == 'name'] <- 'SV_type'
 ```
 
 
+## 2-2. AnnotSV: benchmark.annot
+
+After writing new VCF files with proper headers, we are able to run AnnotSV on them and obtain respective annotated TSV files that we are able to finally work with:
+
+```{r}
+# reading in annotated TSV files
+# delly.annot <- read_tsv("AnnotSV_NA12878_delly.tsv") ## omitted in 1st edition due to header bugs
+manta.annot <- read_tsv("AnnotSV_NA12878_manta.tsv")
+melt.annot <- read_tsv("AnnotSV_NA12878_melt.tsv")
+wham.annot <- read_tsv("AnnotSV_NA12878_wham.tsv")
+```
+
+```{r}
+# Assigning callers
+# delly.annot$Caller <- "Delly"
+manta.annot$Caller <- "Manta"
+melt.annot$Caller <- "Melt"
+wham.annot$Caller <- "Wham"
+```
+
+Potentially we can filter each data set before joining them. However, here, we will save that step for the master file.
+
+```{r message=FALSE}
+# joining all annotated files into one master file
+library(plyr)
+
+#join(delly.annot, manta.annot, type = "full") %>%
+
+join(manta.annot, melt.annot, type = "full") %>% 
+#  join(melt.annot, type = "full") %>%
+   join(wham.annot, type = "full") -> benchmark.annot
+
+# untick plyr afterwards to avoid conflict with dplyr
+detach("package:plyr", unload = TRUE)
+```
+
+Check whether this way of joining data sets affect the integrity of the resultant master file.
+
+
+```{r}
+# optional clean-up to save memory
+#rm("delly.annot")
+rm("manta.annot")
+rm("melt.annot")
+rm("wham.annot")
+```
+
+```{r}
+# double checking the dimensions
+dim(benchmark.annot)
+```
+
+### Columns
+
+That's the original annotSV columns (105) + Caller descriptor (1) = 106 lines.
+
+
+### Rows
+
+> Why is the resultant file so large? At first sight, why are there so many duplicate rows?
+
+Q: Are there --- and if so, *why* are there --- multiple (considerable) duplicates created by AnnotSV? Why?
+
+> Should we remove/synthesise the duplicate rows?
+
+> How do we do that?
+
+
+## 2-3. Filtering the AnnotSV files
+
+### 2-3-1. Filter by Quality
+
+Note that previous data sets (benchmark.master and benchmark.bed) have been filtered based on the criteria
+
+    df$FILTER == "PASS"
+    
+...and we will do the same (for now) with our master Annot file:
+```{r}
+filter(benchmark.annot, FILTER == "PASS") -> benchmark.annot
+```
+
+
+Double-checking the dimensions of each master file:
+```{r}
+dim(benchmark.annot)
+dim(benchmark.bed)
+dim(benchmark.master)
+```
+
+Explain the above difference.
+
+
+### 2-3-2. Synthesise by duplicates
+
+
+
+
+
+
+
 
 # 3. Analysis
 
@@ -276,6 +378,23 @@ ggsave("SV_type_NA12878.png")
 rm("sample_size")
 ```
 
+Let's double check the result is consistent using the AnnotSV files:
+```{r message=FALSE}
+sample_size = benchmark.annot %>% group_by(SV_type) %>% summarize(num=n())
+
+benchmark.annot %>%
+  left_join(sample_size) %>%
+  mutate(svtype = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = svtype, fill=Caller)) +
+    geom_bar() + #scale_y_log10() +
+    theme_bw() +
+    labs(x="Type of SV", y="count") +
+    ggtitle("Types of structural variants detected by different callers \n in NA12878, using AnnotSV")
+
+rm("sample_size")
+```
+
 
 ## 3-3. Number of variants detected by all methods
 
@@ -320,32 +439,99 @@ filter(benchmark.bed, start==26001844 & end==26002386) %>%
 
 QC seems to pass. Conclusion: No single SV were called by all callers in this data set.
 
-
-## 3-4. Detected variants affecting CDS or ACMG class of variants
-
-For this task we need further annotation using the chromosomal address and other packages that map them to known gene databases.
+Or is it...
 
 ```{r}
-## load package and set biomaRt dataset
-library(biomaRt)
-ensembl = useEnsembl(biomart='ensembl', 
-                     dataset="hsapiens_gene_ensembl") 
+# double-checking our results using AnnotSV files
+subset(benchmark.annot, select = c("SV_start", "SV_end", "SV_type", "ID", "Caller")) -> cant.pipe
 
-## run query
-gene.annot <- getBM(attributes = c("hgnc_symbol", "chromosome_name", "start_position", "end_position"), 
-                 filters = c("chromosome_name", "start", "end"),
-                 values = list(benchmark.bed[,1], benchmark.bed[,2], benchmark.bed[,3]),
-                 mart = ensembl)
+aggregate(cant.pipe[5], cant.pipe[-5], unique) -> place.holder
+
+place.holder$ID <- NULL
+
+aggregate(place.holder[4], place.holder[-4], FUN = function(X) paste(unique(X), collapse=", ")) -> common.variants
+
+# checking callers power set distribution
+table(as.factor(common.variants$Caller))
+
+# plot
+sample_size = common.variants %>% group_by(Caller) %>% summarize(num=n())
+
+common.variants %>%
+  left_join(sample_size) %>%
+  mutate(caller = paste0(Caller, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = caller, fill=SV_type)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="SV Caller", y="count") +
+    ggtitle("Number of structural variants detected by each caller in NA12878")
 ```
 
-Or, to debug:
+
 ```{r}
-postions_combined <- apply(as.matrix(benchmark.bed[, 1:3]), 1, paste, collapse = ":")
-
-gene.annot2 <- getBM(attributes = c("hgnc_symbol", "chromosome_name", "start_position", "end_position"), 
-                 filters = c("chromosomal_region"),
-                 values = postions_combined,
-                 mart = ensembl)
+rm("sample_size")
+rm("cant.pipe")
+rm("place.holder")
 ```
 
+Explain the discrepancy.
+
+
+
+## 3-4. ACMG class of variants
+
+```{r}
+# first, see the distribution of ACMG class in annotated data
+table(as.factor(benchmark.annot$ACMG_class))
+```
+
+Next time, consider bringing mode="split" so the following joining step need not be done.
+
+```{r}
+# cleaning calls of NA pathogenicity class
+filter(benchmark.annot, ACMG_class != "full=NA") -> benchmark.ACMG
+
+# joining full and split mode calls
+# by directly forcing "full=x" -> 'x'
+benchmark.ACMG[benchmark.ACMG == "full=1"] <- "1"
+benchmark.ACMG[benchmark.ACMG == "full=3"] <- "3"
+benchmark.ACMG[benchmark.ACMG == "full=4"] <- "4"
+benchmark.ACMG[benchmark.ACMG == "full=5"] <- "5"
+```
+
+
+```{r message=FALSE}
+sample_size = benchmark.ACMG %>% group_by(ACMG_class) %>% summarize(num=n())
+
+benchmark.ACMG %>%
+  left_join(sample_size) %>%
+  mutate(ACMG.class = paste0(ACMG_class, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = ACMG.class, fill=SV_type)) + # can try fill=Caller next
+    geom_bar() +
+    theme_bw() +
+    labs(x="ACMG class", y="count") +
+    ggtitle("ACMG class and SV type detected by various callers in NA12878")
+
+ggsave("ACMG_NA12878_annot.png")
+
+rm("sample_size")
+```
+
+Is this graph trust-worthy? Why?
+
+```{r}
+length(benchmark.ACMG$ACMG_class) == length(benchmark.bed)
+length(benchmark.ACMG$ACMG_class) == length(benchmark.master)
+```
+
+Explain the discrepancy.
+
+
+## 3-5. Detected variants affecting CDS
+
+```{r}
+table(as.factor(benchmark.annot$Location2))
+```
 
