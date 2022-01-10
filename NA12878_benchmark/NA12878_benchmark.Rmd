@@ -1,0 +1,296 @@
+---
+title: "Benchmarking NA12878 SVs by different callers"
+edition: "1st"
+output: html_notebook
+---
+# Introduction
+
+See ReadME.md.
+
+In the first edition, we are:
+
+    1) using the .vcf files directly. AnnotSV is having some issues currently and will be used once troubleshot.
+    2) dismissing the Svaba files as they are problematic.
+
+Filtering and processing notes:
+
+    1) The data ("callers") have been filtered by selecting only the "PASS" callers; and
+    2) No info of supporting reads are used as of 1st Edition.
+
+# 1. Data loading and processing
+```{r}
+library(tidyverse)
+library(vcfR)
+library(GenomicRanges)
+```
+
+```{r}
+delly.vcf <- read.vcfR("NA12878.delly.vcf")
+manta.vcf <- read.vcfR("NA12878.manta.vcf")
+melt.vcf <- read.vcfR("NA12878.melt.vcf")
+wham.vcf <- read.vcfR("NA12878.wham.vcf") 
+# svaba.sv.vcf <- read.vcfR("NA12878.svaba.sv.vcf")
+# svaba.indel.vcf <- read.vcfR("NA12878.svaba.indel.vcf")
+```
+
+As usual, SvABA is pulling sh**t:
+
+> "Your file appears to have 10 header elements and 13 columns in the body. This should never happen!"
+
+In the first edition we will ignore the svaba files.
+
+```{r}
+# filtering only PASS SVs
+as.data.frame(getFIX(delly.vcf)) %>% 
+  filter(FILTER == "PASS") -> delly.pass
+as.data.frame(getFIX(manta.vcf)) %>% 
+  filter(FILTER == "PASS") -> manta.pass
+as.data.frame(getFIX(melt.vcf)) %>% 
+  filter(FILTER == "PASS") -> melt.pass
+as.data.frame(getFIX(wham.vcf)) %>% 
+  filter(FILTER == "PASS") -> wham.pass
+
+#as.data.frame(getFIX(svaba.sv.vcf)) %>% 
+  #filter(FILTER == "PASS") -> svaba.sv.pass
+#as.data.frame(getFIX(svaba.indel.vcf)) %>% 
+  #filter(FILTER == "PASS") -> svaba.indel.pass
+```
+
+```{r message=FALSE}
+# assigning respective callers
+delly.pass$Caller <- "Delly"
+manta.pass$Caller <- "Manta"
+melt.pass$Caller <- "Melt"
+wham.pass$Caller <- "Wham"
+
+# synthesise the filtered data frames into one master file
+library(plyr)
+
+join(delly.pass, manta.pass, type = "full") %>%
+ join(melt.pass, type = "full") %>%
+  join(wham.pass, type = "full") -> benchmark.master
+  #join(svaba.sv.pass, type = "full") %>%
+  #join(svaba.indel.pass, type = "full") 
+
+# untick plyr afterwards to avoid conflict with dplyr
+detach("package:plyr", unload = TRUE)
+rm("delly.pass")
+rm("manta.pass")
+rm("melt.pass")
+rm("wham.pass")
+```
+
+
+# 2. Annotation
+
+As expected, the "ALT" column contains not only SV_type info for larger variants, but also the entire variant description if "fillable" inside the cell...
+
+This is problematic and for any meaningful analysis to be carried out, we need to annotate the file.
+
+```{r}
+# From Papenfuss lab 
+# https://github.com/PapenfussLab/gridss/blob/master/example/somatic-fusion-gene-candidates.R
+# 
+# Very basic example R script that demonstrates
+# how GRIDSS output can be combined with the 
+# StructuralVariantAnnotation package and BioConductor
+# to perform useful analyses.
+#
+# This script performs a very basic check for somatic
+# gene fusions that could result in a fusion transcript
+# It does not check that the transcript in in-frame, nor
+# does it check that the resultant fusion actually involves
+# one or more exons from each gene.
+#
+# CRAN packages
+library(devtools)
+library(stringr)
+
+# bioconductor packages
+library(VariantAnnotation)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(rtracklayer)
+library(StructuralVariantAnnotation) # install_github("d-cameron/StructuralVariantAnnotation")
+```
+
+
+```{r}
+# Simple SV type classifier
+simpleEventType <- function(gr) {
+  pgr = partner(gr)
+  return(ifelse(seqnames(gr) != seqnames(pgr), "CTX", # inter-chromosomosal
+    ifelse(strand(gr) == strand(pgr), "INV",
+      ifelse(gr$insLen >= abs(gr$svLen) * 0.7, "INS", # TODO: improve classification of complex events
+        ifelse(xor(start(gr) < start(pgr), strand(gr) == "-"), "DEL",
+          "DUP")))))
+}
+```
+
+
+```{r}
+# using manta calls as example
+vcf <- readVcf("NA12878.delly.vcf")
+info(header(vcf)) = unique(as(rbind(as.data.frame(info(header(vcf))), data.frame(
+	row.names=c("SIMPLE_TYPE"),
+	Number=c("1"),
+	Type=c("String"),
+	Description=c("Simple event type annotation based purely on breakend position and orientation."))), "DataFrame"))
+gr <- breakpointRanges(vcf)
+svtype <- simpleEventType(gr)
+info(vcf)$SIMPLE_TYPE <- NA_character_
+info(vcf[gr$sourceId])$SIMPLE_TYPE <- svtype
+              # info(vcf[gr$sourceId])$SVLEN <- gr$svLen  -- What does this line do?
+## writeVcf(vcf, "chr12.1527326.DEL1024.sv.annotated.vcf") 
+
+# TODO: perform event filtering here
+# By default, GRIDSS is very sensitive but this comes at the cost of a high false discovery rate
+gr <- gr[gr$FILTER == "PASS" & partner(gr)$FILTER == "PASS"] # Remove low confidence calls
+
+simplegr <- gr[simpleEventType(gr) %in% c("INS", "INV", "DEL", "DUP")]
+simplebed <- data.frame(
+	chrom=seqnames(simplegr),
+	# call the centre of the homology/inexact interval
+	start=as.integer((start(simplegr) + end(simplegr)) / 2),
+	end=as.integer((start(partner(simplegr)) + end(partner(simplegr))) / 2),
+	name=simpleEventType(simplegr),
+	score=simplegr$QUAL,
+	strand="."
+)
+# Just the lower of the two breakends so we don't output everything twice
+simplebed <- simplebed[simplebed$start < simplebed$end,]
+# write.table(simplebed, "chr12.1527326.DEL1024.simple.bed", quote=FALSE, sep='\t', row.names=FALSE, col.names=FALSE)
+```
+
+```{r}
+str(simplebed)
+```
+
+```{r}
+table(simplebed$name)
+```
+
+Now, assign simplebed (eqv? annot.tsv) to each caller and remove/repeat:
+```{r}
+# copy df
+delly.bed <- data.frame(simplebed) ## use CallerName.bed
+```
+
+```{r eval=FALSE}
+# clean-up
+rm(vcf)
+rm(gr)
+rm(simplegr)
+rm(simplebed)
+```
+
+
+Now we can synthesise the simplebed files from each caller:
+```{r message=FALSE}
+# assigning respective callers
+delly.bed$Caller <- "Delly"
+manta.bed$Caller <- "Manta"
+melt.bed$Caller <- "Melt"
+wham.bed$Caller <- "Wham"
+
+# synthesise the filtered data frames into one master file
+library(plyr)
+
+join(delly.bed, manta.bed, type = "full") %>%
+ join(melt.bed, type = "full") %>%
+  join(wham.bed, type = "full") -> benchmark.bed
+  #join(svaba.sv.bed, type = "full") %>%
+  #join(svaba.indel.bed, type = "full") 
+
+# untick plyr afterwards to avoid conflict with dplyr
+detach("package:plyr", unload = TRUE)
+rm("delly.bed")
+rm("manta.bed")
+rm("melt.bed")
+rm("wham.bed")
+```
+
+
+Double checking the format:
+```{r}
+str(benchmark.bed)
+```
+
+Rename the "name" column, which stores SV_type:
+```{r}
+names(benchmark.bed)[names(benchmark.bed) == 'name'] <- 'SV_type'
+```
+
+
+
+# 3. Analysis
+
+## 3-1. SV call location across NA12878 by different callers
+
+```{r}
+# fix x-axis ("CHROM") order
+benchmark.master$CHROM <- factor(benchmark.master$CHROM, levels=unique(benchmark.master$CHROM))
+table(benchmark.master$CHROM) ## checking up
+```
+
+
+```{r message=FALSE}
+#sample_size = benchmark.master %>% group_by(CHROM) %>% summarize(num=n())
+
+#benchmark.master %>%
+  #left_join(sample_size) %>%
+  #mutate(chrom = paste0(CHROM, "\n (n=", num, ")")) %>%
+
+ggplot(benchmark.master, aes(x = CHROM, fill=Caller)) + # set x=chrom if want to include sample size, n (overlapping issue)
+    geom_bar() + #scale_y_log10() +
+    theme_bw() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1.2)) +
+    labs(x="Chromosome", y="count") + 
+    ggtitle("SV location by caller in NA12878")
+
+ggsave("SV_location_NA12878.png")
+```
+
+## 3-2. SV type by caller 
+
+```{r}
+# fix x-axis ("SV_type") order
+benchmark.bed$SV_type <- factor(benchmark.bed$SV_type, levels=unique(benchmark.bed$SV_type))
+table(benchmark.bed$SV_type) ## checking up
+```
+
+```{r message=FALSE}
+sample_size = benchmark.bed %>% group_by(SV_type) %>% summarize(num=n())
+
+benchmark.bed %>%
+  left_join(sample_size) %>%
+  mutate(svtype = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = svtype, fill=Caller)) +
+    geom_bar() + #scale_y_log10() +
+    theme_bw() + #theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1.2)) +
+    labs(x="SV type", y="count") + 
+    ggtitle("Simple SV type as detected by different callers in NA12878")
+
+ggsave("SV_type_NA12878.png")
+```
+
+
+## 3-3. Number of variants detected by all methods
+
+```{r}
+# group variants called by multiple callers
+common.variants <- aggregate(benchmark.bed[7], benchmark.master[-7], FUN = function(X) paste(unique(X), collapse=", "))
+# check format
+table(as.factor(common.variants$Caller))
+table(as.factor(benchmark.bed$Caller))
+```
+
+
+
+
+## 3-4. Detected variants affecting CDS or ACMG class of variants
+
+
+
+
+
