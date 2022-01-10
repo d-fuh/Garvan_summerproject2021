@@ -272,25 +272,80 @@ ggplot(aes(x = svtype, fill=Caller)) +
     ggtitle("Simple SV type as detected by different callers in NA12878")
 
 ggsave("SV_type_NA12878.png")
+
+rm("sample_size")
 ```
 
 
 ## 3-3. Number of variants detected by all methods
 
 ```{r}
-# group variants called by multiple callers
-common.variants <- aggregate(benchmark.bed[7], benchmark.master[-7], FUN = function(X) paste(unique(X), collapse=", "))
-# check format
-table(as.factor(common.variants$Caller))
 table(as.factor(benchmark.bed$Caller))
 ```
 
+We want to know: Are any of these calls made by multiple callers? We take the following approach.
 
+Count the start=start and end=end and if n=4 we know it's been called by all four callers --- *if there are no duplicates in each caller* --- this can be weakly tested by if(n >= 5) {return "DUPLICATE"}.
+
+```{r message=FALSE}
+## count number of same calls | no dup for each caller
+same.sv.count <- benchmark.bed %>% 
+                    #aggregate(.[7], .[-7], FUN = function(X) paste(unique(X), collapse=", ")) %>% 
+                      group_by(start, end) %>% summarise( n=n() ) 
+
+ggplot(same.sv.count, aes(x=n)) +
+    geom_bar() +
+    theme_bw() + xlab("Number of callers calling the same calls in NA12878")
+
+ggsave("Multiple_calls_count.png")
+```
+
+```{r}
+# QC
+length(unique(same.sv.count$start)) == nrow(same.sv.count)
+length(unique(same.sv.count$end)) == nrow(same.sv.count)
+length(unique(same.sv.count$start)) == length(unique(same.sv.count$end))
+```
+
+Explain the above results.
+
+
+```{r}
+# QC
+# this address is purportedly to contain 3 Calls
+filter(benchmark.bed, start==26001844 & end==26002386) %>%
+  view() # unique callers or 3 suplicates, etc?
+```
+
+
+QC seems to pass. Conclusion: No single SV were called by all callers in this data set.
 
 
 ## 3-4. Detected variants affecting CDS or ACMG class of variants
 
+For this task we need further annotation using the chromosomal address and other packages that map them to known gene databases.
 
+```{r}
+## load package and set biomaRt dataset
+library(biomaRt)
+ensembl = useEnsembl(biomart='ensembl', 
+                     dataset="hsapiens_gene_ensembl") 
 
+## run query
+gene.annot <- getBM(attributes = c("hgnc_symbol", "chromosome_name", "start_position", "end_position"), 
+                 filters = c("chromosome_name", "start", "end"),
+                 values = list(benchmark.bed[,1], benchmark.bed[,2], benchmark.bed[,3]),
+                 mart = ensembl)
+```
+
+Or, to debug:
+```{r}
+postions_combined <- apply(as.matrix(benchmark.bed[, 1:3]), 1, paste, collapse = ":")
+
+gene.annot2 <- getBM(attributes = c("hgnc_symbol", "chromosome_name", "start_position", "end_position"), 
+                 filters = c("chromosomal_region"),
+                 values = postions_combined,
+                 mart = ensembl)
+```
 
 
