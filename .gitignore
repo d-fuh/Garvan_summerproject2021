@@ -7,3 +7,4 @@
 *.vcf
 *.tsv.gz
 *.DS_Store  ## MacOS product
+AnnotSV_*.html  ## AnnotSV VCF visualisation file
