@@ -228,7 +228,7 @@ names(benchmark.bed)[names(benchmark.bed) == 'name'] <- 'SV_type'
 
 After writing new VCF files with proper headers, we are able to run AnnotSV on them and obtain respective annotated TSV files that we are able to finally work with:
 
-```{r}
+```{r warning=FALSE, message=FALSE}
 # reading in annotated TSV files
 # delly.annot <- read_tsv("AnnotSV_NA12878_delly.tsv") ## omitted in 1st edition due to header bugs
 manta.annot <- read_tsv("AnnotSV_NA12878_manta.tsv")
