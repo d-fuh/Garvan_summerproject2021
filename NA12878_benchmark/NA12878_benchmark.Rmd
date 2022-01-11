@@ -1,24 +1,33 @@
 ---
 title: "Benchmarking NA12878 SVs by different callers"
-edition: "1st"
+edition: "2nd"
+date: "Jan 11, 2022"
 output: html_notebook
 ---
 # Introduction
 
 See ReadME.md.
 
-In the first edition, we are:
-
-    1) using the .vcf files directly. AnnotSV is having some issues currently and will be used once troubleshot.
-    2) dismissing the Svaba files as they are problematic.
-
 Filtering and processing notes:
 
-    1) The data ("callers") have been filtered by selecting only the "PASS" callers; and
-    2) No info of supporting reads are used as of 1st Edition.
+    1) FILTER == "PASS"
+    2) We will try to include supporting reads info on the 2nd edition workflow;
+    3) Currently awaiting gold standard NA12878 SV call set ("truth set")
+    4) Will aim to expand "call match" criteria: Specifically,
+    
+  In the first edition, we used "Start = Start && end = end" as the criteria for matching SV calls;
+        
+  This appeared too strict, as many calls do not have multiple callers reported.
+        
+  We will change this criterion to:
+        
+        Start <belongs to> [Start_std +- CI%] && end <belongs to> [End_std +- CI%]
+
+
+# Main 
 
 # 1. Data loading and processing: Benchmark.master
-```{r}
+```{r message=FALSE}
 library(tidyverse)
 library(vcfR)
 library(GenomicRanges)
@@ -29,15 +38,9 @@ delly.vcf <- read.vcfR("NA12878.delly.vcf")
 manta.vcf <- read.vcfR("NA12878.manta.vcf")
 melt.vcf <- read.vcfR("NA12878.melt.vcf")
 wham.vcf <- read.vcfR("NA12878.wham.vcf") 
-# svaba.sv.vcf <- read.vcfR("NA12878.svaba.sv.vcf")
-# svaba.indel.vcf <- read.vcfR("NA12878.svaba.indel.vcf")
+svaba.vcf <- read.vcfR("NA12878.svaba.sv.vcf") ## again, svaba full of problems...
 ```
 
-As usual, SvABA is pulling sh**t:
-
-> "Your file appears to have 10 header elements and 13 columns in the body. This should never happen!"
-
-In the first edition we will ignore the svaba files.
 
 ```{r}
 # filtering only PASS SVs
@@ -49,11 +52,8 @@ as.data.frame(getFIX(melt.vcf)) %>%
   filter(FILTER == "PASS") -> melt.pass
 as.data.frame(getFIX(wham.vcf)) %>% 
   filter(FILTER == "PASS") -> wham.pass
-
-#as.data.frame(getFIX(svaba.sv.vcf)) %>% 
-  #filter(FILTER == "PASS") -> svaba.sv.pass
-#as.data.frame(getFIX(svaba.indel.vcf)) %>% 
-  #filter(FILTER == "PASS") -> svaba.indel.pass
+as.data.frame(getFIX(svaba.vcf)) %>% 
+  filter(FILTER == "PASS") -> svaba.pass
 ```
 
 ```{r message=FALSE}
@@ -62,15 +62,15 @@ delly.pass$Caller <- "Delly"
 manta.pass$Caller <- "Manta"
 melt.pass$Caller <- "Melt"
 wham.pass$Caller <- "Wham"
+svaba.pass$Caller <- "SvABA"
 
 # synthesise the filtered data frames into one master file
 library(plyr)
 
 join(delly.pass, manta.pass, type = "full") %>%
  join(melt.pass, type = "full") %>%
-  join(wham.pass, type = "full") -> benchmark.master
-  #join(svaba.sv.pass, type = "full") %>%
-  #join(svaba.indel.pass, type = "full") 
+  join(wham.pass, type = "full") %>%
+    join(svaba.pass, type = "full") -> benchmark.master
 
 # untick plyr afterwards to avoid conflict with dplyr
 detach("package:plyr", unload = TRUE)
@@ -78,10 +78,11 @@ rm("delly.pass")
 rm("manta.pass")
 rm("melt.pass")
 rm("wham.pass")
+rm("svaba.pass")
 ```
 
 
-# 2. Annotation
+# 2. Annotation (For vcfR objects only; skip to 2-2 if using AnnotSV outputs)
 
 As expected, the "ALT" column contains not only SV_type info for larger variants, but also the entire variant description if "fillable" inside the cell...
 
@@ -130,9 +131,11 @@ simpleEventType <- function(gr) {
 ```
 
 
-```{r}
+```{r message=FALSE}
 # using manta calls as example
-vcf <- readVcf("NA12878.wham.vcf")
+
+vcf <- readVcf("NA12878.wham.vcf") ## replace VCF input manually to generate respective files
+
 info(header(vcf)) = unique(as(rbind(as.data.frame(info(header(vcf))), data.frame(
 	row.names=c("SIMPLE_TYPE"),
 	Number=c("1"),
@@ -161,7 +164,7 @@ simplebed <- data.frame(
 )
 # Just the lower of the two breakends so we don't output everything twice
 simplebed <- simplebed[simplebed$start < simplebed$end,]
-# write.table(simplebed, "chr12.1527326.DEL1024.simple.bed", quote=FALSE, sep='\t', row.names=FALSE, col.names=FALSE)
+# write.table(simplebed, "caller.simple.bed", quote=FALSE, sep='\t', row.names=FALSE, col.names=FALSE)
 ```
 
 ```{r}
@@ -194,15 +197,15 @@ delly.bed$Caller <- "Delly"
 manta.bed$Caller <- "Manta"
 melt.bed$Caller <- "Melt"
 wham.bed$Caller <- "Wham"
+svaba.bed$Caller <- "SvABA"
 
 # synthesise the filtered data frames into one master file
 library(plyr)
 
 join(delly.bed, manta.bed, type = "full") %>%
  join(melt.bed, type = "full") %>%
-  join(wham.bed, type = "full") -> benchmark.bed
-  #join(svaba.sv.bed, type = "full") %>%
-  #join(svaba.indel.bed, type = "full") 
+  join(wham.bed, type = "full") %>%
+    join(svaba.bed, type = "full")  -> benchmark.bed
 
 # untick plyr afterwards to avoid conflict with dplyr
 detach("package:plyr", unload = TRUE)
@@ -210,6 +213,7 @@ rm("delly.bed")
 rm("manta.bed")
 rm("melt.bed")
 rm("wham.bed")
+rm("svaba.bed")
 ```
 
 
@@ -226,35 +230,41 @@ names(benchmark.bed)[names(benchmark.bed) == 'name'] <- 'SV_type'
 
 ## 2-2. AnnotSV: benchmark.annot
 
-After writing new VCF files with proper headers, we are able to run AnnotSV on them and obtain respective annotated TSV files that we are able to finally work with:
+    (Option 1) After writing new VCF files with proper headers, we are able to run AnnotSV on them and obtain respective annotated TSV files that we are able to work with; or
+
+    (Option 2) (Much more simply) Decompress your VCF files properly on MacOS and use [AnnotSV](https://lbgi.fr/AnnotSV/).
 
 ```{r warning=FALSE, message=FALSE}
 # reading in annotated TSV files
-# delly.annot <- read_tsv("AnnotSV_NA12878_delly.tsv") ## omitted in 1st edition due to header bugs
+delly.annot <- read_tsv("AnnotSV_NA12878_delly.tsv")
 manta.annot <- read_tsv("AnnotSV_NA12878_manta.tsv")
 melt.annot <- read_tsv("AnnotSV_NA12878_melt.tsv")
 wham.annot <- read_tsv("AnnotSV_NA12878_wham.tsv")
+svaba.annot <- read_tsv("AnnotSV_NA12878_svaba.tsv")
 ```
 
 ```{r}
 # Assigning callers
-# delly.annot$Caller <- "Delly"
+delly.annot$Caller <- "Delly"
 manta.annot$Caller <- "Manta"
 melt.annot$Caller <- "Melt"
 wham.annot$Caller <- "Wham"
+svaba.annot$Caller <- "SvABA"
 ```
 
-Potentially we can filter each data set before joining them. However, here, we will save that step for the master file.
+Potentially we can filter each data set before joining them. If that's not done yet via AnnotSV while inputting, you can save that step for the master file later.
 
 ```{r message=FALSE}
 # joining all annotated files into one master file
 library(plyr)
 
-#join(delly.annot, manta.annot, type = "full") %>%
+join(delly.annot, manta.annot, type = "full") %>%
+  join(manta.annot, type = "full") %>% 
+    join(melt.annot, type = "full") %>%
+      join(wham.annot, type = "full") %>%
+        join(svaba.annot, type = "full") -> benchmark.annot 
 
-join(manta.annot, melt.annot, type = "full") %>% 
-#  join(melt.annot, type = "full") %>%
-   join(wham.annot, type = "full") -> benchmark.annot
+    ##TODO  we need to really double check that this is the correct way to join these data frames....
 
 # untick plyr afterwards to avoid conflict with dplyr
 detach("package:plyr", unload = TRUE)
@@ -265,10 +275,11 @@ Check whether this way of joining data sets affect the integrity of the resultan
 
 ```{r}
 # optional clean-up to save memory
-#rm("delly.annot")
+rm("delly.annot")
 rm("manta.annot")
 rm("melt.annot")
 rm("wham.annot")
+rm("svaba.annot")
 ```
 
 ```{r}
@@ -287,9 +298,26 @@ That's the original annotSV columns (105) + Caller descriptor (1) = 106 lines.
 
 Q: Are there --- and if so, *why* are there --- multiple (considerable) duplicates created by AnnotSV? Why?
 
+Suspect the "split" annotation mode in AnnotSV created multiple annotations for large (~ 20M bp) SVs generated especially in Delly. This may account for the following observation:
+
+```{r}
+# plot SV calls by Delly in AnnotSV
+
+## highlight Annotation_mode
+
+```
+
+
 > Should we remove/synthesise the duplicate rows?
 
+Yes.
+
 > How do we do that?
+
+
+    aggregate(df, by:)
+
+
 
 
 ## 2-3. Filtering the AnnotSV files
@@ -390,7 +418,7 @@ ggplot(aes(x = svtype, fill=Caller)) +
     geom_bar() + #scale_y_log10() +
     theme_bw() +
     labs(x="Type of SV", y="count") +
-    ggtitle("Types of structural variants detected by different callers \n in NA12878, using AnnotSV")
+    ggtitle("Types of structural variants detected by different callers in NA12878, \n using AnnotSV")
 
 rm("sample_size")
 ```
@@ -404,7 +432,23 @@ table(as.factor(benchmark.bed$Caller))
 
 We want to know: Are any of these calls made by multiple callers? We take the following approach.
 
-Count the start=start and end=end and if n=4 we know it's been called by all four callers --- *if there are no duplicates in each caller* --- this can be weakly tested by if(n >= 5) {return "DUPLICATE"}.
+
+- Original approach (1st edition):
+
+> Count the start=start and end=end and if n=4 we know it's been called by all four callers --- *if there are no duplicates in each caller* --- this can be weakly tested by if(n >= 5) {return "DUPLICATE"}.
+
+
+
+- Updated approach (2nd edition):
+
+> Let CI% == "a set standard (0.1%?)", then define two given SV calls match if and only if,
+
+      start_A %in% [start_std +- CI%] && end_A %in% [end_std +- CI%]
+      
+> ... and we can use the original workflow to aggregate the Callers for same SV calls (as defined above).
+
+
+### 3-3-1. Original approach: Count the multiplicity of callers for each SV call
 
 ```{r message=FALSE}
 ## count number of same calls | no dup for each caller
@@ -478,6 +522,33 @@ rm("place.holder")
 Explain the discrepancy.
 
 
+### 3-3-2. Updated approach: Aggregating caller set in master file using "wiggled" SV matching criteria, then output
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## 3-4. ACMG class of variants
 
@@ -534,4 +605,36 @@ Explain the discrepancy.
 ```{r}
 table(as.factor(benchmark.annot$Location2))
 ```
+
+
+### 3-5-1. CDS-affecting SVs
+
+
+
+
+
+
+
+
+
+### 3-5-2. The elite list
+
+<1st layer: AnnotSV input level>
+
+    Raw call set %>% filter(PASS) %>% filter(ACMG = {4,5}) %>% 
+    
+<2nd layer:>    
+
+          filter(Called by e.g. at least 3 callers out of 5 used) %>% filter(CDS-affecting) %>% filter(Known to affect XX tissue)
+
+Further refinement:
+
+
+
+
+
+
+
+
+
 
