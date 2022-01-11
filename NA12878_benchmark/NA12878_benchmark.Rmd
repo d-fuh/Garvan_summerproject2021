@@ -38,7 +38,7 @@ delly.vcf <- read.vcfR("NA12878.delly.vcf")
 manta.vcf <- read.vcfR("NA12878.manta.vcf")
 melt.vcf <- read.vcfR("NA12878.melt.vcf")
 wham.vcf <- read.vcfR("NA12878.wham.vcf") 
-svaba.vcf <- read.vcfR("NA12878.svaba.sv.vcf") ## again, svaba full of problems...
+svaba.vcf <- read.vcfR("NA12878.svaba.sv.test.vcf") ## again, svaba full of problems...
 ```
 
 

@@ -1,0 +1,609 @@
+---
+title: "Benchmarking NA12878 SVs by different callers, excluding SvABA"
+output: html_notebook
+---
+# Introduction
+
+See ReadME.md.
+
+Filtering and processing notes:
+
+    1) FILTER == "PASS"
+    2) We will try to include supporting reads info on the 2nd edition workflow;
+    3) Currently awaiting gold standard NA12878 SV call set ("truth set")
+    4) Will aim to expand "call match" criteria: Specifically,
+    
+  In the first edition, we used "Start = Start && end = end" as the criteria for matching SV calls;
+        
+  This appeared too strict, as many calls do not have multiple callers reported.
+        
+  We will change this criterion to:
+        
+        Start <belongs to> [Start_std +- CI%] && end <belongs to> [End_std +- CI%]
+
+
+# Main 
+
+# 1. Data loading and processing: Benchmark.master
+```{r message=FALSE}
+library(tidyverse)
+library(vcfR)
+library(GenomicRanges)
+```
+
+```{r}
+delly.vcf <- read.vcfR("NA12878.delly.vcf")
+manta.vcf <- read.vcfR("NA12878.manta.vcf")
+melt.vcf <- read.vcfR("NA12878.melt.vcf")
+wham.vcf <- read.vcfR("NA12878.wham.vcf") 
+```
+
+
+```{r}
+# filtering only PASS SVs
+as.data.frame(getFIX(delly.vcf)) %>% 
+  filter(FILTER == "PASS") -> delly.pass
+as.data.frame(getFIX(manta.vcf)) %>% 
+  filter(FILTER == "PASS") -> manta.pass
+as.data.frame(getFIX(melt.vcf)) %>% 
+  filter(FILTER == "PASS") -> melt.pass
+as.data.frame(getFIX(wham.vcf)) %>% 
+  filter(FILTER == "PASS") -> wham.pass
+```
+
+```{r message=FALSE}
+# assigning respective callers
+delly.pass$Caller <- "Delly"
+manta.pass$Caller <- "Manta"
+melt.pass$Caller <- "Melt"
+wham.pass$Caller <- "Wham"
+
+# synthesise the filtered data frames into one master file
+library(plyr)
+
+join(delly.pass, manta.pass, type = "full") %>%
+ join(melt.pass, type = "full") %>%
+  join(wham.pass, type = "full") -> benchmark.master
+
+# untick plyr afterwards to avoid conflict with dplyr
+detach("package:plyr", unload = TRUE)
+rm("delly.pass")
+rm("manta.pass")
+rm("melt.pass")
+rm("wham.pass")
+```
+
+
+# 2. Annotation (For vcfR objects only; skip to 2-2 if using AnnotSV outputs)
+
+As expected, the "ALT" column contains not only SV_type info for larger variants, but also the entire variant description if "fillable" inside the cell...
+
+This is problematic and for any meaningful analysis to be carried out, we need to annotate the file.
+
+## 2-1. Benchmark.bed (Pseudo-BED file using a PapenfussLab workflow)
+
+```{r}
+# From Papenfuss lab 
+# https://github.com/PapenfussLab/gridss/blob/master/example/somatic-fusion-gene-candidates.R
+# 
+# Very basic example R script that demonstrates
+# how GRIDSS output can be combined with the 
+# StructuralVariantAnnotation package and BioConductor
+# to perform useful analyses.
+#
+# This script performs a very basic check for somatic
+# gene fusions that could result in a fusion transcript
+# It does not check that the transcript in in-frame, nor
+# does it check that the resultant fusion actually involves
+# one or more exons from each gene.
+#
+# CRAN packages
+library(devtools)
+library(stringr)
+
+# bioconductor packages
+library(VariantAnnotation)
+library(GenomicRanges)
+library(GenomicFeatures)
+library(rtracklayer)
+library(StructuralVariantAnnotation) # install_github("d-cameron/StructuralVariantAnnotation")
+```
+
+
+```{r}
+# Simple SV type classifier
+simpleEventType <- function(gr) {
+  pgr = partner(gr)
+  return(ifelse(seqnames(gr) != seqnames(pgr), "CTX", # inter-chromosomosal
+    ifelse(strand(gr) == strand(pgr), "INV",
+      ifelse(gr$insLen >= abs(gr$svLen) * 0.7, "INS", # TODO: improve classification of complex events
+        ifelse(xor(start(gr) < start(pgr), strand(gr) == "-"), "DEL",
+          "DUP")))))
+}
+```
+
+
+```{r message=FALSE}
+# using manta calls as example
+
+vcf <- readVcf("NA12878.wham.vcf") ## replace VCF input manually to generate respective files
+
+info(header(vcf)) = unique(as(rbind(as.data.frame(info(header(vcf))), data.frame(
+	row.names=c("SIMPLE_TYPE"),
+	Number=c("1"),
+	Type=c("String"),
+	Description=c("Simple event type annotation based purely on breakend position and orientation."))), "DataFrame"))
+gr <- breakpointRanges(vcf)
+svtype <- simpleEventType(gr)
+info(vcf)$SIMPLE_TYPE <- NA_character_
+info(vcf[gr$sourceId])$SIMPLE_TYPE <- svtype
+info(vcf[gr$sourceId])$SVLEN <- gr$svLen ## svLen == "svLeng" and stores the length of the SVs
+writeVcf(vcf, "NA12878.wham.annot.vcf") 
+
+# TODO: perform event filtering here
+# By default, GRIDSS is very sensitive but this comes at the cost of a high false discovery rate
+gr <- gr[gr$FILTER == "PASS" & partner(gr)$FILTER == "PASS"] # Remove low confidence calls
+
+simplegr <- gr[simpleEventType(gr) %in% c("INS", "INV", "DEL", "DUP")]
+simplebed <- data.frame(
+	chrom=seqnames(simplegr),
+	# call the centre of the homology/inexact interval
+	start=as.integer((start(simplegr) + end(simplegr)) / 2),
+	end=as.integer((start(partner(simplegr)) + end(partner(simplegr))) / 2),
+	name=simpleEventType(simplegr),
+	score=simplegr$QUAL,
+	strand="."
+)
+# Just the lower of the two breakends so we don't output everything twice
+simplebed <- simplebed[simplebed$start < simplebed$end,]
+# write.table(simplebed, "caller.simple.bed", quote=FALSE, sep='\t', row.names=FALSE, col.names=FALSE)
+```
+
+```{r}
+str(simplebed)
+```
+
+```{r}
+table(simplebed$name)
+```
+
+Now, assign simplebed (eqv? annot.tsv) to each caller and remove/repeat:
+```{r}
+# copy df
+delly.bed <- data.frame(simplebed) ## use CallerName.bed
+```
+
+```{r eval=FALSE}
+# clean-up
+rm(vcf)
+rm(gr)
+rm(simplegr)
+rm(simplebed)
+```
+
+
+Now we can synthesise the simplebed files from each caller:
+```{r message=FALSE}
+# assigning respective callers
+delly.bed$Caller <- "Delly"
+manta.bed$Caller <- "Manta"
+melt.bed$Caller <- "Melt"
+wham.bed$Caller <- "Wham"
+
+# synthesise the filtered data frames into one master file
+library(plyr)
+
+join(delly.bed, manta.bed, type = "full") %>%
+ join(melt.bed, type = "full") %>%
+  join(wham.bed, type = "full") -> benchmark.bed
+
+# untick plyr afterwards to avoid conflict with dplyr
+detach("package:plyr", unload = TRUE)
+rm("delly.bed")
+rm("manta.bed")
+rm("melt.bed")
+rm("wham.bed")
+```
+
+
+Double checking the format:
+```{r}
+str(benchmark.bed)
+```
+
+Rename the "name" column, which stores SV_type:
+```{r}
+names(benchmark.bed)[names(benchmark.bed) == 'name'] <- 'SV_type'
+```
+
+
+## 2-2. AnnotSV: benchmark.annot
+
+    (Option 1) After writing new VCF files with proper headers, we are able to run AnnotSV on them and obtain respective annotated TSV files that we are able to work with; or
+
+    (Option 2) (Much more simply) Decompress your VCF files properly on MacOS and use [AnnotSV](https://lbgi.fr/AnnotSV/).
+
+```{r warning=FALSE, message=FALSE}
+# reading in annotated TSV files
+delly.annot <- read_tsv("AnnotSV_NA12878_delly.tsv")
+manta.annot <- read_tsv("AnnotSV_NA12878_manta.tsv")
+melt.annot <- read_tsv("AnnotSV_NA12878_melt.tsv")
+wham.annot <- read_tsv("AnnotSV_NA12878_wham.tsv")
+```
+
+```{r}
+# Assigning callers
+delly.annot$Caller <- "Delly"
+manta.annot$Caller <- "Manta"
+melt.annot$Caller <- "Melt"
+wham.annot$Caller <- "Wham"
+```
+
+Potentially we can filter each data set before joining them. If that's not done yet via AnnotSV while inputting, you can save that step for the master file later.
+
+```{r message=FALSE}
+# joining all annotated files into one master file
+library(plyr)
+
+join(delly.annot, manta.annot, type = "full") %>%
+  join(manta.annot, type = "full") %>% 
+    join(melt.annot, type = "full") %>%
+      join(wham.annot, type = "full") -> benchmark.annot 
+
+    ##TODO  we need to really double check that this is the correct way to join these data frames....
+
+# untick plyr afterwards to avoid conflict with dplyr
+detach("package:plyr", unload = TRUE)
+```
+
+Check whether this way of joining data sets affect the integrity of the resultant master file.
+
+Note that there is significant improvement i.e. no "crazy duplicate rows" we see when "split" mode is used for AnnotSV (See Introduction).
+
+
+```{r}
+# optional clean-up to save memory
+rm("delly.annot")
+rm("manta.annot")
+rm("melt.annot")
+rm("wham.annot")
+```
+
+```{r}
+# double checking the dimensions
+dim(benchmark.annot)
+```
+
+### Columns
+
+That's the original annotSV columns (105) + Caller descriptor (1) = 106 lines.
+
+
+
+## 2-3. Filtering the AnnotSV files
+
+### 2-3-1. Filter by Quality
+
+Do we need to filter or is this done already during AnnotSV?
+```{r}
+table(as.factor(benchmark.annot$FILTER))
+```
+
+For safety let's only use those designated as "PASS":
+
+```{r}
+filter(benchmark.annot, FILTER == "PASS") -> benchmark.annot
+```
+
+
+Double-checking the dimensions of each master file:
+```{r}
+dim(benchmark.annot) ## from AnnotSV, containing database-referenced info
+dim(benchmark.master) ## from raw vcfR object, containing minimal info
+```
+
+Explain the above difference.
+
+
+
+# 3. Analysis
+
+## 3-1. SV call location across NA12878 by different callers
+
+### 3-1-1. (ORIGINAL) Using benchmark.master
+
+```{r}
+# fix x-axis ("CHROM") order
+benchmark.master$CHROM <- factor(benchmark.master$CHROM, levels=unique(benchmark.master$CHROM))
+table(benchmark.master$CHROM) ## checking up
+```
+
+
+```{r message=FALSE}
+#sample_size = benchmark.master %>% group_by(CHROM) %>% summarize(num=n())
+
+#benchmark.master %>%
+  #left_join(sample_size) %>%
+  #mutate(chrom = paste0(CHROM, "\n (n=", num, ")")) %>%
+
+ggplot(benchmark.master, aes(x = CHROM, fill=Caller)) + # set x=chrom if want to include sample size, n (overlapping issue)
+    geom_bar() + #scale_y_log10() +
+    theme_bw() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1.2)) +
+    labs(x="Chromosome", y="count") + 
+    ggtitle("SV location by caller in NA12878, excluding SvABA")
+
+ggsave("SV_location_NA12878_updated.png")
+```
+
+Explain the observation of SVs on chrY, knowing NA12878 is a female individual:
+
+```{r}
+# in VCF master file
+filter(benchmark.master, CHROM == "chrY") %>%
+  print()
+
+# in AnnotSV file
+filter(benchmark.annot, SV_chrom == "chrY") %>%
+  print()
+```
+
+Explain why there seems to be no entries on chrY (as expected) but then it's called in the above plot?
+
+
+Let's say I don't trust the results from the original benchmark.master file at all. Let's repeat the plot:
+
+
+### 3-1-2. (UPDATED) Using benchmark.annot
+
+```{r}
+#as.character(benchmark.annot$SV_chrom) -> benchmark.annot$SV_chrom
+benchmark.annot$SV_chrom <- factor(benchmark.annot$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y"))
+table(benchmark.annot$SV_chrom)
+```
+
+```{r message=FALSE}
+ggplot(benchmark.annot, aes(x = SV_chrom, fill=Caller)) +
+    geom_bar() + #scale_y_log10() +
+    theme_bw() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1.2)) +
+    labs(x="Chromosome", y="count") + 
+    ggtitle("SV location by caller in NA12878, excluding SvABA, using AnnotSV")
+
+ggsave("SV_location_NA12878_annotSV.png")
+```
+
+It looks exactly (?) the same!
+
+
+
+## 3-2. SV type by caller 
+
+### 3-2-1. (ORIGINAL) Using the GRIDSS workflow-derived pseudo-BED file
+
+> NB: "SimpleEvents" containing only DEL, DUP, INS, INV.
+
+```{r}
+# fix x-axis ("SV_type") order
+benchmark.bed$SV_type <- factor(benchmark.bed$SV_type, levels=unique(benchmark.bed$SV_type))
+table(benchmark.bed$SV_type) ## checking up
+```
+
+```{r message=FALSE}
+sample_size = benchmark.bed %>% group_by(SV_type) %>% summarize(num=n())
+
+benchmark.bed %>%
+  left_join(sample_size) %>%
+  mutate(svtype = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = svtype, fill=Caller)) +
+    geom_bar() + #scale_y_log10() +
+    theme_bw() + #theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1.2)) +
+    labs(x="SV type", y="count") + 
+    ggtitle("Simple SV type as detected by different callers in NA12878")
+
+ggsave("SV_type_NA12878.png")
+
+rm("sample_size")
+```
+
+
+
+### 3-2-2. (UPDATED) Using AnnotSV
+
+> NB: Multiple SV classes as described by AnnotSV
+
+```{r message=FALSE}
+sample_size = benchmark.annot %>% group_by(SV_type) %>% summarize(num=n())
+
+benchmark.annot %>%
+  left_join(sample_size) %>%
+  mutate(svtype = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = svtype, fill=Caller)) +
+    geom_bar() + #scale_y_log10() +
+    theme_bw() +
+    labs(x="Type of SV", y="count") +
+    ggtitle("Types of structural variants detected by different callers in NA12878, \n excluding SvABA, using AnnotSV")
+
+rm("sample_size")
+```
+
+
+## 3-3. Number of variants detected by all methods
+
+```{r}
+table(as.factor(benchmark.bed$Caller))
+```
+
+We want to know: Are any of these calls made by multiple callers? We take the following approach.
+
+
+- Original approach (1st edition):
+
+> Count the start=start and end=end and if n=4 we know it's been called by all four callers --- *if there are no duplicates in each caller* --- this can be weakly tested by if(n >= 5) {return "DUPLICATE"}.
+
+
+
+- Updated approach (2nd edition):
+
+> Let CI% == "a set standard (0.1%?)", then define two given SV calls match if and only if,
+
+      start_A %in% [start_std +- CI%] && end_A %in% [end_std +- CI%]
+      
+> ... and we can use the original workflow to aggregate the Callers for same SV calls (as defined above).
+
+
+### 3-3-1. Original approach: Aggregate master AnnotSV file using strict start=start, end=end approach
+
+```{r}
+# double-checking our results using AnnotSV files
+subset(benchmark.annot, select = c("SV_start", "SV_end", "SV_type", "ID", "Caller")) -> cant.pipe
+
+aggregate(cant.pipe[5], cant.pipe[-5], unique) -> place.holder
+
+place.holder$ID <- NULL
+
+aggregate(place.holder[4], place.holder[-4], FUN = function(X) paste(unique(X), collapse=", ")) -> common.variants
+
+# checking callers power set distribution
+table(as.factor(common.variants$Caller))
+
+# plot
+sample_size = common.variants %>% group_by(Caller) %>% summarize(num=n())
+
+common.variants %>%
+  left_join(sample_size) %>%
+  mutate(caller = paste0(Caller, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = caller, fill=SV_type)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="SV Caller", y="count") +
+    ggtitle("Number of structural variants detected by each caller in NA12878")
+```
+
+
+```{r}
+rm("sample_size")
+rm("cant.pipe")
+rm("place.holder")
+```
+
+Explain the discrepancy.
+
+
+### 3-3-2. (UPDATED) Aggregating caller set in master file using relaxed SV matching criteria
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 3-4. ACMG class of variants
+
+```{r}
+# first, see the distribution of ACMG class in annotated data
+table(as.factor(benchmark.annot$ACMG_class))
+```
+
+Next time, consider bringing mode="split" so the following joining step need not be done.
+
+```{r}
+# cleaning calls of NA pathogenicity class
+filter(benchmark.annot, ACMG_class != "full=NA") -> benchmark.ACMG
+
+# joining full and split mode calls
+# by directly forcing "full=x" -> 'x'
+benchmark.ACMG[benchmark.ACMG == "full=1"] <- "1"
+benchmark.ACMG[benchmark.ACMG == "full=3"] <- "3"
+benchmark.ACMG[benchmark.ACMG == "full=4"] <- "4"
+benchmark.ACMG[benchmark.ACMG == "full=5"] <- "5"
+```
+
+
+```{r message=FALSE}
+sample_size = benchmark.ACMG %>% group_by(ACMG_class) %>% summarize(num=n())
+
+benchmark.ACMG %>%
+  left_join(sample_size) %>%
+  mutate(ACMG.class = paste0(ACMG_class, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = ACMG.class, fill=SV_type)) + # can try fill=Caller next
+    geom_bar() +
+    theme_bw() +
+    labs(x="ACMG class", y="count") +
+    ggtitle("ACMG class and SV type detected by various callers in NA12878")
+
+ggsave("ACMG_NA12878_annot.png")
+
+rm("sample_size")
+```
+
+Is this graph trust-worthy? Why?
+
+```{r}
+length(benchmark.ACMG$ACMG_class) == length(benchmark.bed)
+length(benchmark.ACMG$ACMG_class) == length(benchmark.master)
+```
+
+Explain the discrepancy.
+
+
+## 3-5. Detected variants affecting CDS
+
+```{r}
+table(as.factor(benchmark.annot$Location2))
+```
+
+
+### 3-5-1. CDS-affecting SVs
+
+
+
+
+
+
+
+
+
+### 3-5-2. The elite list
+
+<1st layer: AnnotSV input level>
+
+    Raw call set %>% filter(PASS) %>% filter(ACMG = {4,5}) %>% 
+    
+<2nd layer:>    
+
+          filter(Called by e.g. at least 3 callers out of 5 used) %>% filter(CDS-affecting) %>% filter(Known to affect XX tissue)
+
+Further refinement:
+
+
+
+
+
+
+
+
+
+
