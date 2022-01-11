@@ -9,3 +9,4 @@
 *.DS_Store
 NA12878_benchmark/AnnotSV_vis_*.html
 NA12878_benchmark/Version_?/*.*
+NA12878_benchmark/*.nb.html
