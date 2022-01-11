@@ -1,4 +1,3 @@
-# can also specify using file name wildcard etc
 *.jar
 *.pdf
 *.docx
@@ -9,3 +8,4 @@
 *.tsv.gz
 *.DS_Store
 NA12878_benchmark/AnnotSV_vis_*.html
+NA12878_benchmark/Version_?/*.*
