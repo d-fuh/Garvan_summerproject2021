@@ -17,5 +17,5 @@ NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv   ## file too large
 NA12878_benchmark/AnnotVis/*.*
 
 # Previous version items
-NA12878_benchmark/Version_?/*.*
-NA12878_benchmark/Version_*/*.*
+NA12878_benchmark/Version_?/*.*  ## first-level
+NA12878_benchmark/Version_previous/Version_*/*.*  ## adjust for second-level directories
