@@ -337,3 +337,39 @@ Yeah, this requires Annotation_mode == "Split"...
 We will carry out this work later when we generate a bunch of split files.
 
 
+
+## 6. Sandbox
+
+```{r}
+subset(benchmark.annot.maestro, select=c("AnnotSV_ID",	"SV_chrom",	"SV_start",	"SV_end",	"SV_length",	"SV_type",	"Samples_ID",	"ID",	"REF",	"ALT",	"QUAL",	"FILTER",	"INFO", "CytoBand",	"Gene_name",	"Gene_count", "ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ","OMIM_morbid",	"OMIM_morbid_candidate","GnomAD_pLI",	"ExAC_pLI",	"AnnotSV_ranking_score",	"AnnotSV_ranking_criteria",	"ACMG_class",	"Coverage", "Caller")) -> maestro.small
+```
+
+Later, we can eliminate column with all NA by "some method". Note this is largely due to Annotation_mode =="full".
+
+```{r message=FALSE}
+# reorder the chrom #
+maestro.small$SV_chrom <- factor(maestro.small$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
+
+maestro.small %>%
+  group_by(Coverage, SV_chrom) %>%
+    summarise(mean.A = mean(n()),
+    sd.A = sd(n()),
+    SE.A = sd(n())/sqrt(n())) %>%
+# Bar plot
+  ggplot(aes(SV_chrom, mean.A, fill=Coverage)) +
+    geom_bar(stat = "identity", position = position_dodge()) +
+    
+    #geom_text(aes(label = paste(round(mean.A, 0))), position = position_dodge(0.7), 
+              #vjust =0.0, hjust=0.7, size = 3.5) + ## labels mean data on top of bar
+    
+    geom_errorbar(aes(ymin = mean.A-SE.A, ymax = mean.A+SE.A), width = 0.3, position = position_dodge(0.9)) +
+    ylab("Count") + xlab("Chromosome") +
+    theme_classic()
+
+#ggsave("SV_location_by_coverage_annotated_NA12878.png")
+```
+
+
+
+
+
