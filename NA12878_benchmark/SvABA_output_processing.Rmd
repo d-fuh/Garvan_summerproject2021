@@ -1,0 +1,39 @@
+---
+title: "SvABA output processing"
+output: html_notebook
+---
+This is a workflow to process raw SvABA outputs (VCF) to prevent the header-column number mismatch error
+
+# 0. Download your VCF output from SvABA workflow (VCF)
+# 1. Bash
+```{bash}
+# grep the header element row
+grep "#CHROM" sample.svaba.raw.vcf
+
+# replace old colnames with new
+## replace $long_name_to_be_replaced with $NewColName, usually sample name
+cat sample.svaba.raw.vcf | awk '{gsub("FILTER\tINFO\tFORMAT\t$long_name_to_be_replaced", "FILTER\tINFO\tFORMAT\tA\tB\tC\t$NewColName")}1' > sample.svaba.new.vcf
+```
+
+
+# 2. R
+```{r}
+# load the new, renamed VCF file
+library(vcfR)
+
+to.be.cleaned.vcf <- read.vcfR("sample.svaba.new.vcf")
+
+# eliminate the 3 problematic columns
+
+to.be.cleaned.vcf@gt = to.be.cleaned.vcf@gt[, -c(2:4)]
+
+# write the now cleaned vcf object into new VCF file to be used for benchmarking
+
+write.vcf(to.be.cleaned.vcf, "sample.svaba.vcf")
+```
+
+```{r}
+# test output file
+test.vcf <- read.vcfR("sample.svaba.vcf")
+```
+

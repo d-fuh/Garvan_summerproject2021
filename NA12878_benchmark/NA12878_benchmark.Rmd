@@ -1,7 +1,7 @@
 ---
 title: "Benchmarking NA12878 SVs by different callers"
-edition: "2nd"
-date: "Jan 11, 2022"
+edition: "3rd"
+date: "Jan 12, 2022"
 output: html_notebook
 ---
 # Introduction
@@ -38,7 +38,7 @@ delly.vcf <- read.vcfR("NA12878.delly.vcf")
 manta.vcf <- read.vcfR("NA12878.manta.vcf")
 melt.vcf <- read.vcfR("NA12878.melt.vcf")
 wham.vcf <- read.vcfR("NA12878.wham.vcf") 
-svaba.vcf <- read.vcfR("NA12878.svaba.sv.test.vcf") ## again, svaba full of problems...
+svaba.vcf <- read.vcfR("NA12878.svaba.vcf")
 ```
 
 
@@ -292,61 +292,67 @@ dim(benchmark.annot)
 That's the original annotSV columns (105) + Caller descriptor (1) = 106 lines.
 
 
-### Rows
-
-> Why is the resultant file so large? At first sight, why are there so many duplicate rows?
-
-Q: Are there --- and if so, *why* are there --- multiple (considerable) duplicates created by AnnotSV? Why?
-
-Suspect the "split" annotation mode in AnnotSV created multiple annotations for large (~ 20M bp) SVs generated especially in Delly. This may account for the following observation:
-
-```{r}
-# plot SV calls by Delly in AnnotSV
-
-## highlight Annotation_mode
-
-```
-
-
-> Should we remove/synthesise the duplicate rows?
-
-Yes.
-
-> How do we do that?
-
-
-    aggregate(df, by:)
-
-
-
 
 ## 2-3. Filtering the AnnotSV files
 
 ### 2-3-1. Filter by Quality
 
-Note that previous data sets (benchmark.master and benchmark.bed) have been filtered based on the criteria
+Do we need to filter or is this done already during AnnotSV?
 
-    df$FILTER == "PASS"
-    
-...and we will do the same (for now) with our master Annot file:
 ```{r}
-filter(benchmark.annot, FILTER == "PASS") -> benchmark.annot
+table(as.factor(benchmark.annot$FILTER))
 ```
+
+For safety let's only use those designated as "PASS":
+
 
 
 Double-checking the dimensions of each master file:
 ```{r}
-dim(benchmark.annot)
-dim(benchmark.bed)
-dim(benchmark.master)
+dim(benchmark.annot) ## from AnnotSV, containing database-referenced info
+dim(benchmark.master) ## from raw vcfR object, containing minimal info
 ```
 
 Explain the above difference.
 
 
-### 2-3-2. Synthesise by duplicates
+
+### 2-3-2. Other quality reassurance
+
+Remember that as of the 2nd edition, we used Annotation_mode == "full" for our SV annotation. As a results, many of the calls (esp. those by Delly?) contain massive gene sets that were affected, as the SV called spanned from 50 bp to 20 Mb (!).
+
+> Should we consider these enormous SVs? Why?
 
 
+```{r}
+range(benchmark.annot$Gene_count)
+table(as.factor(benchmark.annot$Gene_count))
+ggplot(benchmark.annot, aes(x=Gene_count)) + geom_histogram(binwidth = 1) +
+  scale_x_sqrt() + scale_y_sqrt()
+```
+
+```{r}
+mean(benchmark.annot$Gene_count)
+median(benchmark.annot$Gene_count)
+```
+
+```{r}
+mean(benchmark.annot$Gene_count) + 2*sd(benchmark.annot$Gene_count)
+mean(benchmark.annot$Gene_count) + 3*sd(benchmark.annot$Gene_count) -> gc.cap
+gc.cap
+```
+
+We may therefore consider:
+
+```{r}
+filter(benchmark.annot, Gene_count <= gc.cap) -> benchmark.annot.small
+```
+
+```{r}
+mean(benchmark.annot.small$Gene_count)
+median(benchmark.annot.small$Gene_count)
+ggplot(benchmark.annot.small, aes(x=Gene_count)) + geom_histogram() + scale_x_sqrt() + scale_y_sqrt()
+```
 
 
 
@@ -356,6 +362,8 @@ Explain the above difference.
 # 3. Analysis
 
 ## 3-1. SV call location across NA12878 by different callers
+
+### 3-1-1. (ORIGINAL) Using benchmark.master
 
 ```{r}
 # fix x-axis ("CHROM") order
@@ -380,7 +388,51 @@ ggplot(benchmark.master, aes(x = CHROM, fill=Caller)) + # set x=chrom if want to
 ggsave("SV_location_NA12878.png")
 ```
 
+
+	
+Explain the observation of SVs on chrY, knowing NA12878 is a female individual:
+```{r}
+# in VCF master file
+filter(benchmark.master, CHROM == "chrY") %>%
+  print()
+# in AnnotSV file
+filter(benchmark.annot, SV_chrom == "chrY") %>%
+  print()
+```
+
+Explain why there seems to be no entries on chrY (as expected) but then it's called in the above plot?
+
+Let's say I don't trust the results from the original benchmark.master file at all. Let's repeat the plot:
+
+
+### 3-1-2. (UPDATED) Using benchmark.annot
+```{r}
+#as.character(benchmark.annot$SV_chrom) -> benchmark.annot$SV_chrom
+benchmark.annot$SV_chrom <- factor(benchmark.annot$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y"))
+table(benchmark.annot$SV_chrom)
+```
+
+
+```{r message=FALSE}
+ggplot(benchmark.annot, aes(x = SV_chrom, fill=Caller)) +
+    geom_bar() + #scale_y_log10() +
+    theme_bw() + theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1.2)) +
+    labs(x="Chromosome", y="count") + 
+    ggtitle("SV location by caller in NA12878, excluding SvABA, using AnnotSV")
+ggsave("SV_location_NA12878_annotSV.png")
+```
+
+It looks exactly (?) the same!
+
+
+
+
+
 ## 3-2. SV type by caller 
+
+### 3-2-1. (ORIGINAL) Using the GRIDSS workflow-derived pseudo-BED file
+
+> NB: "SimpleEvents" containing only DEL, DUP, INS, INV.
 
 ```{r}
 # fix x-axis ("SV_type") order
@@ -406,7 +458,11 @@ ggsave("SV_type_NA12878.png")
 rm("sample_size")
 ```
 
-Let's double check the result is consistent using the AnnotSV files:
+
+### 3-2-2. (UPDATED) Using AnnotSV
+
+> NB: Multiple SV classes as described by AnnotSV
+
 ```{r message=FALSE}
 sample_size = benchmark.annot %>% group_by(SV_type) %>% summarize(num=n())
 
@@ -422,6 +478,8 @@ ggplot(aes(x = svtype, fill=Caller)) +
 
 rm("sample_size")
 ```
+
+
 
 
 ## 3-3. Number of variants detected by all methods
@@ -448,7 +506,7 @@ We want to know: Are any of these calls made by multiple callers? We take the fo
 > ... and we can use the original workflow to aggregate the Callers for same SV calls (as defined above).
 
 
-### 3-3-1. Original approach: Count the multiplicity of callers for each SV call
+### 3-3-1. Original approach: Aggregate master AnnotSV file using strict start=start, end=end approach
 
 ```{r message=FALSE}
 ## count number of same calls | no dup for each caller
@@ -522,18 +580,36 @@ rm("place.holder")
 Explain the discrepancy.
 
 
-### 3-3-2. Updated approach: Aggregating caller set in master file using "wiggled" SV matching criteria, then output
+### 3-3-2. (UPDATED) Aggregating caller set in master file using relaxed SV matching criteria
 
+The idea is to:
+    - 1. Form a smaller subset from annotated master file first --- this contains SV location, and basic profile such as caller used, SV type, ACMG class, and gene topology.
+    
+    - 2. From this subset: For any two calls (made by different callers, suppose there are no duplicates, including multiple split annotations for one SV), if:
+    
+        df.subset %>%  
+            
+            SV_start_A between() SV_start_B +- 0.02*SV_start_B &&
+            SV_end_A between() SV_end_B +- 0.02*SV_end_B
+        then return TRUE --> aggregate the two rows by "Caller", delimiter = ','
+      ...and repeat this process for all entries. Send new data frame back to the original subset. 
 
+In the resultant df, we should expect:
 
+      Calls considered the same call are grouped into one entry, with $Caller == all callers that called this SV
+      
+i.e.,      
 
+     | start        | end           | ... other variables ... | Caller                      |
+     |:------------:|---------------|:-----------------------:|----------------------------:|
+     | 53218-20     | 53421-24      | ...                     | Delly, Manta                |
+     | 61385        | 63267         | ...                     | Delly                       |
+     | ...          | ...           | ...                     | ...                         |
 
+One way to do this is to group start:end into one column, designated "SV_range":
+...
 
-
-
-
-
-
+(see package "data.table")
 
 
 

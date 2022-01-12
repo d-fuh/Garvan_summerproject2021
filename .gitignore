@@ -7,6 +7,15 @@
 *.vcf
 *.tsv.gz
 *.DS_Store
+
+# NA12878 main folder items
 NA12878_benchmark/AnnotSV_vis_*.html
-NA12878_benchmark/Version_?/*.*
 NA12878_benchmark/*.nb.html
+NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv   ## file too large
+
+# Previous version items --- old
+NA12878_benchmark/Version_?/*.*
+
+# Previous version items --- new
+NA12878_benchmark/AnnotVis/*.*
+NA12878_benchmark/Files_previous_versions/*.*
