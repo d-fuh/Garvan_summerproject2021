@@ -11,12 +11,11 @@
 # NA12878 main folder items
 NA12878_benchmark/AnnotSV_vis_*.html
 NA12878_benchmark/*.nb.html
-NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv   ## file too large
+NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv
 
 # AnnotSV visualisation files
 NA12878_benchmark/AnnotVis/*.*
 
 # Previous version items
-NA12878_benchmark/Version_?/*.*  ## first-level
-NA12878_benchmark/Version_previous/Version_*/*.*  ## adjust for second-level directories
-NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv
+## old: NA12878_benchmark/Version_?/*.*
+NA12878_benchmark/Version_previous/Version_*/*.*
