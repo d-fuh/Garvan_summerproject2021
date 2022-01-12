@@ -71,6 +71,7 @@ See R script "maestro_generation" to generate a fully-annotated "maestro" file c
 library(tidyverse)
 library(vcfR)
 library(GenomicRanges)
+library(vegan)
 ```
 
 
@@ -346,6 +347,9 @@ subset(benchmark.annot.maestro, select=c("AnnotSV_ID",	"SV_chrom",	"SV_start",	"
 
 Later, we can eliminate column with all NA by "some method". Note this is largely due to Annotation_mode =="full".
 
+
+### 6-1. SV location by coverage level
+
 ```{r message=FALSE}
 # reorder the chrom #
 maestro.small$SV_chrom <- factor(maestro.small$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
@@ -368,6 +372,17 @@ maestro.small %>%
 
 #ggsave("SV_location_by_coverage_annotated_NA12878.png")
 ```
+
+### 6-2. SV length ~ Coverage/Caller: ANOVA
+
+
+### 6-3. ExAC Z scores: MDS, colour by Coverage/Caller
+
+The ExAC Z scores (read more at where?) are:
+
+> ExAC_delZ,	ExAC_dupZ,	ExAC_cnvZ,	ExAC_synZ,	ExAC_misZ
+
+
 
 
 
