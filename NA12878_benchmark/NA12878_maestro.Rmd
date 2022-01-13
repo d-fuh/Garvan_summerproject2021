@@ -384,6 +384,13 @@ plot(maestro.small$SV_length) ## see distribution
 
 Filtering based on size?
 
+There are some massive SVs reported by Delly...should we remove them?
+```{r}
+maestro.small %>%
+  filter(SV_length <= 20000) -> maestro.small
+```
+
+
 > NB: SvABA reported mostly indels...of course (called "BND") (Check yourself with SV_start & SV_end)
 > These calls has SV_length == NA, which is problematic
 > Need filter
@@ -431,25 +438,130 @@ subset(maestro.small, select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ
 ```
 
 --> Already standardised?
+
+
 --> No NA, beware of zeros
 ```{r}
 MDS.mtx[complete.cases(MDS.mtx), ] -> MDS.mtx ## removes all rows containing any NA
 ```
 
 
---> Apply similarity measure (Euclidean first?)
-```{r}
+--> Apply similarity measure (Euclidean first?) --> S mtx via vegan::metaMDS
+```{r eval=FALSE}
+### CAUTION: FREEZES R
 MDS.S <- metaMDS(MDS.mtx, distance = "euclidean", autotransform = FALSE, trace=FALSE)
 ```
 
 
---> S mtx
+##### Side-note: metaMDS runtime
+```{r eval=FALSE}
+# dim(MDS.mtx) = [7569, 5] for NA12878_full_annot file
+start.time <- Sys.time()
 
 
---> metaMDS(S_mtx)
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+time.taken
+```
+
+
+How long is metaMDs taking? ....
+
+
+--> Check stress level of MDS
+```{r}
+MDS.S$stress ## Checking MDS stress for interpretation
+MDS.S$stress <= 0.20
+```
+
+
+Recall the standard level of acceptance of MDS stress = 0.20.
+
+
 --> Obtain Cartesian coordinate in S_mtx
+```{r}
+MDS.xy <- data.frame(MDS.S$points) ## Sending the cartesian coordinates in MDS profile to MDS.xy
+```
+
+
 --> Send to new dummy df + assign factors of interest (e.g. Caller)
+```{r}
+# profile fill in to MDS-coordinate frame
+## How to ensure row-to-row match of profile?
+MDS.xy$Caller <- maestro.small$Caller
+MDS.xy$ACMG_class <- maestro.small$ACMG_class
+MDS.xy$ACMG_class <- maestro.small$SV_type
+MDS.xy$ACMG_class <- maestro.small$SV_length
+```
+
+
 --> Run MDS plot and annotate with factor levels #
+```{r}
+# MDS: (1) By Caller
+ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point() +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey22", colour = "black", size = 1),
+        panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.minor = element_blank(),
+        legend.text = element_text(size = 11), 
+        legend.title = element_text(size = 14),
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5)))
+
+ggsave("MDS_by_Caller_NA12878.png")
+
+# MDS: (2) By ACMG class of SV
+ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(aes(color = ACMG_class)) +
+  
+  theme(legend.key = element_rect(fill = NA),
+        legend.text = element_text(size = 11),
+        legend.title = element_text(size = 14),
+        axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey97", colour = "black", size = 1),
+        panel.grid.major = element_line(color = "grey86", size=0.1),
+        panel.grid.minor = element_blank(),
+        #aspect.ratio = 7 / 9.9
+        ) +
+  
+  guides(color = guide_legend(override.aes = list(size = 3)))
+
+ggsave("MDS_by_ACMG_class_NA12878.png")
+```
+```{r}
+# MDS: (3) By SV length
+ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(aes(color = SV_length)) +
+  
+  theme(legend.key = element_rect(fill = NA),
+        legend.text = element_text(size = 11),
+        legend.title = element_text(size = 14),
+        axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey97", colour = "black", size = 1),
+        panel.grid.major = element_line(color = "grey86", size=0.1),
+        panel.grid.minor = element_blank(),
+        #aspect.ratio = 7 / 9.9
+        ) +
+  
+  guides(color = guide_legend(override.aes = list(size = 3)))
+
+ggsave("MDS_by_SV_length_NA12878.png")
+
+# MDS: (4) By SV type
+ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point() +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey22", colour = "black", size = 1),
+        panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.minor = element_blank(),
+        legend.text = element_text(size = 11),
+        legend.title = element_text(size = 14),
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5)))
+
+ggsave("MDS_by_SV_type_NA12878.png")
+```
 
 
 
