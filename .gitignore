@@ -18,6 +18,7 @@ NA12878_benchmark/AnnotVis/*.*
 
 # Previous version items
 NA12878_benchmark/Version_previous/*.*
+NA12878_benchmark/Figures/Previous_version/*.*
 ## back-up
 NA12878_benchmark/Version_previous/Version_*/*.*
 NA12878_benchmark/maestro.annot.csv

@@ -531,6 +531,8 @@ MDS.xy$SV_type = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)
 # MDS: (1) By Caller
 ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
   
+  scale_colour_manual(values = wes_palette("GrandBudapest2")) +
+  
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey15", colour = "black", size = 1),
         panel.grid.major = element_line(color = "grey30", size=0.1),
