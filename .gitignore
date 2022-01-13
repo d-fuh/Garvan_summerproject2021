@@ -17,7 +17,8 @@ NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv
 NA12878_benchmark/AnnotVis/*.*
 
 # Previous version items
-## old: NA12878_benchmark/Version_?/*.*
+NA12878_benchmark/Version_previous/*.*
+## back-up
 NA12878_benchmark/Version_previous/Version_*/*.*
 NA12878_benchmark/maestro.annot.csv
 NA12878_benchmark/AnnotSV_NA12878_delly_split.tsv

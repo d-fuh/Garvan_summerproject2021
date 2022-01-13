@@ -6,7 +6,9 @@ output: html_notebook
 ---
 # Version updates
 
-This is version 1.0 of the Maestro file. We moved relevant codes from the old NA12878_benchmark.rmd to this notebook, and aim to use the maestro file for all analyses. (See maestro_generation.R)
+This is version 1.0 of the Maestro file. 
+
+We moved relevant codes from the old NA12878_benchmark.rmd to this notebook, and aim to use the maestro file for all analyses. (See maestro_generation.R)
 
 ```{r}
 rm(benchmark.master)
@@ -394,13 +396,6 @@ maestro.small %>%
   ggplot(aes(x=log10(SV_length))) + geom_histogram() + xlab("log SV length excluding SNV/BND")
 ```
 
-```{r}
-maestro.small %>%
-  filter(!is.na(SV_length)) %>%
-  filter(SV_length > 1) %>%
-    mean(SV_length)
-```
-
 
 
 ```{r message=FALSE}
@@ -409,27 +404,13 @@ maestro.small %>%
   filter(!is.na(SV_length)) %>%
   filter(SV_length > 1) %>% ## ignoring SNV/BND
   
-  ggplot(aes(x=Caller, y=log10(SV_length))) + geom_boxplot() + # best transform?
+  ggplot(aes(x=Caller, y=log10(SV_length), fill=Caller)) + geom_boxplot() + # best transform?
     theme_bw()
 
-ggsave("SV_length_among_callers_NA12878.png")
+#ggsave("SV_length_among_callers_NA12878.png")
 ```
 
 
-geom_violin next?
-
-
-```{r}
-# Want to know SV length dist. based on callers using violin plot
-maestro.small %>%
-  filter(!is.na(SV_length)) %>%
-  filter(SV_length > 1) %>% ## ignoring SNV/BND
-  
-  ggplot(aes(x=Caller, y=log10(SV_length))) + geom_violin() + # best transform?
-    theme_bw()
-
-#ggsave("SV_length_among_callers_NA12878_violin.png")
-```
 
 
 
