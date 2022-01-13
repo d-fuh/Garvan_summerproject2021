@@ -35,10 +35,13 @@ rm(svtype)
 # Filtering and processing notes:
 
     1) FILTER == "PASS"
-    2) We will try to include supporting reads info on the 2nd edition workflow;
-    3) Currently awaiting gold standard NA12878 SV call set ("truth set")
-
+    2) (Section 6 onwards using maestro.small) -20,000 <= SV_length <= 20,000 (bp)
     
+
+- TODO: Find gold standard NA12878 SV call set ("truth set")
+- TODO: Include supporting reads info
+
+
 ```{r}
 filter(benchmark.annot.maestro, FILTER == "PASS") -> benchmark.maestro
 rm(benchmark.annot.maestro)
@@ -51,6 +54,7 @@ table(as.factor(benchmark.annot$FILTER))
 table(as.factor(benchmark.master$FILTER))
 table(as.factor(s.benchmark.master$FILTER))
 table(as.factor(m.benchmark.annot$FILTER))
+table(as.factor(maestro.small$FILTER))
 ```
 
 You should only see one level in all of the dataframes tested --- "PASS".
@@ -377,17 +381,16 @@ ggsave("SV_location_by_coverage_NA12878.png")
 
 ### 6-2. SV length ~ Coverage/Caller: ANOVA
 
-```{r}
-plot(maestro.small$SV_length) ## see distribution
-```
-
-
-Filtering based on size?
+#### Filtering based on size
 
 There are some massive SVs reported by Delly...should we remove them?
 ```{r}
 maestro.small %>%
-  filter(SV_length <= 20000) -> maestro.small
+  filter(between(SV_length, -20000, 20000)) -> maestro.small
+```
+
+```{r}
+range(maestro.small$SV_length)
 ```
 
 
@@ -400,21 +403,44 @@ maestro.small %>%
 maestro.small %>%
   filter(!is.na(SV_length)) %>%
   filter(SV_length > 1) %>% ## ignoring SNV/BND
-  ggplot(aes(x=log10(SV_length))) + geom_histogram() + xlab("log SV length excluding SNV/BND")
+  ggplot(aes(x=log10(SV_length))) + geom_histogram(binwidth = 0.05) + xlab("log SV length excluding SNV/BND")
 ```
 
+```{r}
+maestro.small %>%
+  filter(!is.na(SV_length)) %>%
+  filter(SV_length > 1) %>% ## ignoring SNV/BND
+  ggplot(aes(x=SV_length)) + geom_histogram(binwidth = 0.05) + scale_x_log10() + xlab("SV length excluding SNV/BND") +
+  theme_bw()
+```
+
+```{r}
+# ignoring SNV/BND
+maestro.small %>%
+  filter(!is.na(SV_length)) %>%
+  filter(SV_length > 1) -> noSNV
+
+mean(noSNV$SV_length)
+median(noSNV$SV_length)
+```
+
+
+```{r message=FALSE}
+ggplot(noSNV, aes(x=SV_type, y=SV_length, fill=SV_type)) + geom_boxplot() + scale_y_log10() +
+  ylab("SV length") + xlab("SV type, excluding SNV and BND") +
+  theme_bw()
+
+ggsave("SV_length_vs_type_excluding_SNV_BND_NA12878.png")
+```
 
 
 ```{r message=FALSE}
 # Want to know SV length dist. based on callers
-maestro.small %>%
-  filter(!is.na(SV_length)) %>%
-  filter(SV_length > 1) %>% ## ignoring SNV/BND
-  
-  ggplot(aes(x=Caller, y=log10(SV_length), fill=Caller)) + geom_boxplot() + # best transform?
+noSNV %>%
+  ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + geom_boxplot() + scale_y_log10() +
     theme_bw()
 
-#ggsave("SV_length_among_callers_NA12878.png")
+ggsave("SV_length_among_callers_NA12878.png")
 ```
 
 
@@ -428,22 +454,33 @@ The ExAC Z scores (read more at where?) are:
 > ExAC_delZ,	ExAC_dupZ,	ExAC_cnvZ,	ExAC_synZ,	ExAC_misZ
 
 
-Since they are Z scores .... known distribution (SND).
+Since they are Z scores ... they should approximately follow known distribution (SND)...right?
+
 
 #### Workflow
 
 --> Extract all ExAC data into numeric mtx
 ```{r}
-subset(maestro.small, select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ")) -> MDS.mtx
+subset(maestro.small, select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ")) -> Z.mtx
 ```
 
 --> Already standardised?
 
 
+
 --> No NA, beware of zeros
 ```{r}
-MDS.mtx[complete.cases(MDS.mtx), ] -> MDS.mtx ## removes all rows containing any NA
+Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes all rows containing any NA
 ```
+
+
+
+##### Check up the complete Z score matrix (Z.mtx)
+```{r}
+Z.mtx %>%
+  ggplot(aes(x=ExAC_delZ)) + geom_density()
+```
+
 
 
 --> Apply similarity measure (Euclidean first?) --> S mtx via vegan::metaMDS
@@ -495,7 +532,7 @@ MDS.xy$ACMG_class <- maestro.small$SV_length
 ```
 
 
---> Run MDS plot and annotate with factor levels #
+--> Run MDS plot and annotate with factor levels 
 ```{r}
 # MDS: (1) By Caller
 ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point() +
@@ -563,7 +600,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point() +
 ggsave("MDS_by_SV_type_NA12878.png")
 ```
 
-
+[END MDS]
 
 
 

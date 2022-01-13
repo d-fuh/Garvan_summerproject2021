@@ -16,17 +16,17 @@ library(vcfR)
 
 # reading in annotated TSV files
 ## small
-s.delly.annot <- read_tsv("AnnotSV_NA12878_small_delly.tsv")
-s.manta.annot <- read_tsv("AnnotSV_NA12878_small_manta.tsv")
-s.melt.annot <- read_tsv("AnnotSV_NA12878_small_melt.tsv")
-s.wham.annot <- read_tsv("AnnotSV_NA12878_small_wham.tsv")
-s.svaba.annot <- read_tsv("AnnotSV_NA12878_small_svaba.tsv")
+s.delly.annot <- read_tsv("AnnotSV_NA12878_small_delly_split.tsv")
+s.manta.annot <- read_tsv("AnnotSV_NA12878_small_manta_split.tsv")
+s.melt.annot <- read_tsv("AnnotSV_NA12878_small_melt_split.tsv")
+s.wham.annot <- read_tsv("AnnotSV_NA12878_small_wham_split.tsv")
+s.svaba.annot <- read_tsv("AnnotSV_NA12878_small_svaba_split.tsv")
 ## medium
-m.delly.annot <- read_tsv("AnnotSV_NA12878_med_delly.tsv")
-m.manta.annot <- read_tsv("AnnotSV_NA12878_med_manta.tsv")
-m.melt.annot <- read_tsv("AnnotSV_NA12878_med_melt.tsv")
-m.wham.annot <- read_tsv("AnnotSV_NA12878_med_wham.tsv")
-m.svaba.annot <- read_tsv("AnnotSV_NA12878_med_svaba.tsv")
+m.delly.annot <- read_tsv("AnnotSV_NA12878_med_delly_split.tsv")
+m.manta.annot <- read_tsv("AnnotSV_NA12878_med_manta_split.tsv")
+m.melt.annot <- read_tsv("AnnotSV_NA12878_med_melt_split.tsv")
+m.wham.annot <- read_tsv("AnnotSV_NA12878_med_wham_split.tsv")
+m.svaba.annot <- read_tsv("AnnotSV_NA12878_med_svaba_split.tsv")
 ## large
 delly.annot <- read_tsv("AnnotSV_NA12878_delly_split.tsv")
 manta.annot <- read_tsv("AnnotSV_NA12878_manta_split.tsv")
@@ -95,21 +95,22 @@ m.benchmark.annot$Coverage <- "Medium"
 benchmark.annot$Coverage <- "Large"
 
 # final filtering step
-filter(s.benchmark.annot, FILTER == "PASS") -> s.benchmark.annot
-filter(m.benchmark.annot, FILTER == "PASS") -> m.benchmark.annot
-filter(benchmark.annot, FILTER == "PASS") -> benchmark.annot
+filter(s.benchmark.annot, FILTER == "PASS") -> s.benchmark.split
+filter(m.benchmark.annot, FILTER == "PASS") -> m.benchmark.split
+filter(benchmark.annot, FILTER == "PASS") -> benchmark.split
 
 
 # combine Annot files from each coverage set (small, medium, large) into one master file
 
 library(plyr)
 
-join(s.benchmark.annot, m.benchmark.annot, type = "full") %>%
-  join(benchmark.annot, type = "full") -> benchmark.split.maestro
+join(s.benchmark.split, m.benchmark.split, type = "full") %>%
+  join(benchmark.split, type = "full") -> benchmark.split.maestro
 
 detach("package:plyr", unload = TRUE)
 
-#write.csv(benchmark.annot.maestro, "maestro.annot.csv")
+write.csv(benchmark.split.maestro, "maestro.split.csv")
 
-# OPTIONAL: USE IF NOT USING NA12878_benchmark.rmd 
-#rm("s.benchmark.annot"); rm("m.benchmark.annot"); rm("benchmark.annot")
+# OPTIONAL: USE IF NOT USING NA12878_benchmark.rmd
+rm("s.benchmark.annot"); rm("m.benchmark.annot"); rm("benchmark.annot")
+rm("s.benchmark.split"); rm("m.benchmark.split"); rm("benchmark.split")
