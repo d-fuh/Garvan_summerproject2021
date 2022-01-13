@@ -370,10 +370,67 @@ maestro.small %>%
     ylab("Count") + xlab("Chromosome") +
     theme_classic()
 
-#ggsave("SV_location_by_coverage_annotated_NA12878.png")
+ggsave("SV_location_by_coverage_NA12878.png")
 ```
 
 ### 6-2. SV length ~ Coverage/Caller: ANOVA
+
+```{r}
+plot(maestro.small$SV_length) ## see distribution
+```
+
+
+Filtering based on size?
+
+> NB: SvABA reported mostly indels...of course (called "BND") (Check yourself with SV_start & SV_end)
+> These calls has SV_length == NA, which is problematic
+> Need filter
+
+
+```{r message=FALSE}
+maestro.small %>%
+  filter(!is.na(SV_length)) %>%
+  filter(SV_length > 1) %>% ## ignoring SNV/BND
+  ggplot(aes(x=log10(SV_length))) + geom_histogram() + xlab("log SV length excluding SNV/BND")
+```
+
+```{r}
+maestro.small %>%
+  filter(!is.na(SV_length)) %>%
+  filter(SV_length > 1) %>%
+    mean(SV_length)
+```
+
+
+
+```{r message=FALSE}
+# Want to know SV length dist. based on callers
+maestro.small %>%
+  filter(!is.na(SV_length)) %>%
+  filter(SV_length > 1) %>% ## ignoring SNV/BND
+  
+  ggplot(aes(x=Caller, y=log10(SV_length))) + geom_boxplot() + # best transform?
+    theme_bw()
+
+ggsave("SV_length_among_callers_NA12878.png")
+```
+
+
+geom_violin next?
+
+
+```{r}
+# Want to know SV length dist. based on callers using violin plot
+maestro.small %>%
+  filter(!is.na(SV_length)) %>%
+  filter(SV_length > 1) %>% ## ignoring SNV/BND
+  
+  ggplot(aes(x=Caller, y=log10(SV_length))) + geom_violin() + # best transform?
+    theme_bw()
+
+#ggsave("SV_length_among_callers_NA12878_violin.png")
+```
+
 
 
 ### 6-3. ExAC Z scores: MDS, colour by Coverage/Caller
@@ -383,7 +440,21 @@ The ExAC Z scores (read more at where?) are:
 > ExAC_delZ,	ExAC_dupZ,	ExAC_cnvZ,	ExAC_synZ,	ExAC_misZ
 
 
+Since they are Z scores .... known distribution (SND).
 
+#### Workflow
+
+--> Extract all ExAC data into numeric mtx
+--> Already standardised?
+--> No NA, beware of zeros
+--> Apply similarity measure (Euclidean first?)
+--> S mtx
+
+
+--> metaMDS(S_mtx)
+--> Obtain Cartesian coordinate in S_mtx
+--> Send to new dummy df + assign factors of interest (e.g. Caller)
+--> Run MDS plot and annotate with factor levels #
 
 
 
