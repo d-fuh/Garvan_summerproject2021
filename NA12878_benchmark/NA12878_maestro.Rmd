@@ -474,7 +474,7 @@ subset(maestro.small, select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ
 ```{r}
 Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes all rows containing any NA
 
-select(Z.mtx, -ExAC_misZ) -> Z.mtx
+#select(Z.mtx, -ExAC_misZ) -> Z.mtx
 
 Z.mtx <- decostand(Z.mtx, method= "max")
 
@@ -483,8 +483,8 @@ round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ
 
 
 ```{r}
-# need to subsample...
-Z.mtx[sample(nrow(Z.mtx), 200), ] -> Z.mtx.sample
+# need to subsample. Last checked: Cap = 400
+Z.mtx[sample(nrow(Z.mtx), 400), ] -> Z.mtx.sample
 ```
 
 
@@ -520,7 +520,7 @@ MDS.xy$ACMG_class = maestro.small[match(row.names(MDS.xy), row.names(maestro.sma
 
 MDS.xy$SV_type = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"SV_type"]
 
-MDS.xy$SV_length = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"SV_length"]
+#MDS.xy$SV_length = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"SV_length"]
 ```
 
 
