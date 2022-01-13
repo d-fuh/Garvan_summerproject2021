@@ -18,7 +18,7 @@ NA12878_benchmark/AnnotVis/*.*
 
 # Items from previous version
 NA12878_benchmark/Version_previous/**/*.*
-NA12878_benchmark/Figures/Previous_version/*.*
+NA12878_benchmark/Figures/Previous_version/**/*.*
 
 # Maestro_scripts
 NA12878_benchmark/Maestro_scripts/maestro.full.csv
