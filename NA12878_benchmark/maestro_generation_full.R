@@ -1,141 +1,16 @@
-# This script generates a "maestro" file containing all "fully-annotated" information from NA12878 SV callers and their subsets. 
-# (Designated "small", "medium", and "large" by Coverage)
+# This script generates a "maestro" file containing annotated information from NA12878 SV callers and their subsets
+# using the online tool AnnotSV. 
+# (Files and respective data frames are designated "small", "medium", and "large" by Coverage)
 
-# NB: The final output has NOT been filtered by quality. Please use the main workflow for manual filtering.
 # Annotation_mode == "full". See more in ReadME.md.
-# Final output: benchmark.annot.maestro (data frame)
+# Final output: {benchmark.maestro (data frame), maestro.full.csv}
 # START WORKFLOW
 
 library(tidyverse)
-library(vcfR)
-
-# load VCF
-## small
-s.delly.vcf <- read.vcfR("NA12878_small.delly.vcf")
-s.manta.vcf <- read.vcfR("NA12878_small.manta.vcf")
-s.melt.vcf <- read.vcfR("NA12878_small.melt.vcf")
-s.wham.vcf <- read.vcfR("NA12878_small.wham.vcf") 
-s.svaba.vcf <- read.vcfR("NA12878_small.svaba.vcf")
-
-## medium
-m.delly.vcf <- read.vcfR("NA12878_med.delly.vcf")
-m.manta.vcf <- read.vcfR("NA12878_med.manta.vcf")
-m.melt.vcf <- read.vcfR("NA12878_med.melt.vcf")
-m.wham.vcf <- read.vcfR("NA12878_med.wham.vcf") 
-m.svaba.vcf <- read.vcfR("NA12878_med.svaba.vcf")
-
-## large
-delly.vcf <- read.vcfR("NA12878.delly.vcf")
-manta.vcf <- read.vcfR("NA12878.manta.vcf")
-melt.vcf <- read.vcfR("NA12878.melt.vcf")
-wham.vcf <- read.vcfR("NA12878.wham.vcf") 
-svaba.vcf <- read.vcfR("NA12878.svaba.vcf")
-
 
 #################################################################################################################################
-######################## Section 1. Generate benchmark.master from FIX region of all VCF files ##################################
+######################## Generate benchmark.annot.maestro from AnnotSV-annotated files from all callers #########################
 #################################################################################################################################
-
-
-## NB: Is "getFIX" correct?
-## ***MOVING THE FILTERING STEP TO THE LAST ONE AND SEE THE DIFFERENCE***
-
-## small
-as.data.frame(getFIX(s.delly.vcf)) -> s.delly.pass
-as.data.frame(getFIX(s.manta.vcf)) -> s.manta.pass
-as.data.frame(getFIX(s.melt.vcf)) -> s.melt.pass
-as.data.frame(getFIX(s.wham.vcf)) -> s.wham.pass
-as.data.frame(getFIX(s.svaba.vcf)) -> s.svaba.pass
-
-## medium
-as.data.frame(getFIX(m.delly.vcf)) -> m.delly.pass
-as.data.frame(getFIX(m.manta.vcf)) -> m.manta.pass
-as.data.frame(getFIX(m.melt.vcf)) -> m.melt.pass
-as.data.frame(getFIX(m.wham.vcf)) -> m.wham.pass
-as.data.frame(getFIX(m.svaba.vcf)) -> m.svaba.pass
-
-## large
-as.data.frame(getFIX(delly.vcf)) -> delly.pass
-as.data.frame(getFIX(manta.vcf)) -> manta.pass
-as.data.frame(getFIX(melt.vcf)) -> melt.pass
-as.data.frame(getFIX(wham.vcf)) -> wham.pass
-as.data.frame(getFIX(svaba.vcf)) -> svaba.pass
-
-# clear
-rm("s.delly.vcf"); rm("s.manta.vcf"); rm("s.melt.vcf"); rm("s.wham.vcf"); rm("s.svaba.vcf")
-
-rm("m.delly.vcf"); rm("m.manta.vcf"); rm("m.melt.vcf"); rm("m.wham.vcf"); rm("m.svaba.vcf")
-
-rm("delly.vcf"); rm("manta.vcf"); rm("melt.vcf"); rm("wham.vcf"); rm("svaba.vcf")
-
-
-# assigning respective callers
-## small
-s.delly.pass$Caller <- "Delly"
-s.manta.pass$Caller <- "Manta"
-s.melt.pass$Caller <- "Melt"
-s.wham.pass$Caller <- "Wham"
-s.svaba.pass$Caller <- "SvABA"
-
-## medium
-m.delly.pass$Caller <- "Delly"
-m.manta.pass$Caller <- "Manta"
-m.melt.pass$Caller <- "Melt"
-m.wham.pass$Caller <- "Wham"
-m.svaba.pass$Caller <- "SvABA"
-
-## large
-delly.pass$Caller <- "Delly"
-manta.pass$Caller <- "Manta"
-melt.pass$Caller <- "Melt"
-wham.pass$Caller <- "Wham"
-svaba.pass$Caller <- "SvABA"
-
-# synthesise the filtered data frames into one master file
-library(plyr)
-## small
-join(s.delly.pass, s.manta.pass, type = "full") %>%
-  join(s.melt.pass, type = "full") %>%
-  join(s.wham.pass, type = "full") %>%
-  join(s.svaba.pass, type = "full") -> s.benchmark.master
-
-## medium
-join(m.delly.pass, m.manta.pass, type = "full") %>%
-  join(m.melt.pass, type = "full") %>%
-  join(m.wham.pass, type = "full") %>%
-  join(m.svaba.pass, type = "full") -> m.benchmark.master
-
-## large
-join(delly.pass, manta.pass, type = "full") %>%
-  join(melt.pass, type = "full") %>%
-  join(wham.pass, type = "full") %>%
-  join(svaba.pass, type = "full") -> benchmark.master
-
-# untick plyr afterwards to avoid conflict with dplyr
-detach("package:plyr", unload = TRUE)
-
-rm("s.delly.pass"); rm("s.manta.pass"); rm("s.melt.pass"); rm("s.wham.pass"); rm("s.svaba.pass")
-
-rm("m.delly.pass"); rm("m.manta.pass"); rm("m.melt.pass"); rm("m.wham.pass"); rm("m.svaba.pass")
-
-rm("delly.pass"); rm("manta.pass"); rm("melt.pass"); rm("wham.pass"); rm("svaba.pass")
-
-
-# append coverage dataset information
-s.benchmark.master$Coverage <- "Small"
-m.benchmark.master$Coverage <- "Medium"
-benchmark.master$Coverage <- "Large"
-
-# final filtering step
-filter(s.benchmark.master, FILTER == "PASS") -> s.benchmark.master
-filter(m.benchmark.master, FILTER == "PASS") -> m.benchmark.master
-filter(benchmark.master, FILTER == "PASS") -> benchmark.master
-
-
-#################################################################################################################################
-##################### Section 2. Generate benchmark.annot.maestro from AnnotSV-annotated files from all callers #################
-#################################################################################################################################
-
 
 # reading in annotated TSV files
 ## small
@@ -191,13 +66,11 @@ join(m.delly.annot, m.manta.annot, type = "full") %>%
   join(m.wham.annot, type = "full") %>%
   join(m.svaba.annot, type = "full") -> m.benchmark.annot
 
-## large
+## large: r.d.s.
 join(delly.annot, manta.annot, type = "full") %>%
   join(melt.annot, type = "full") %>%
   join(wham.annot, type = "full") %>%
   join(svaba.annot, type = "full") -> benchmark.annot 
-
-##TODO double check that this is the correct way to join these data frames....
 
 # untick plyr afterwards to avoid conflict with dplyr
 detach("package:plyr", unload = TRUE)
@@ -228,12 +101,11 @@ filter(benchmark.annot, FILTER == "PASS") -> benchmark.annot
 library(plyr)
 
 join(s.benchmark.annot, m.benchmark.annot, type = "full") %>%
-  join(benchmark.annot, type = "full") -> benchmark.annot.maestro
+  join(benchmark.annot, type = "full") -> benchmark.full
 
 detach("package:plyr", unload = TRUE)
 
-#write.csv(benchmark.annot.maestro, "maestro.annot.csv")
+#write.csv(benchmark.full, "maestro.full.csv")
 
-# OPTIONAL: USE IF NOT USING NA12878_benchmark.rmd 
+# clear intermediate files
 rm("s.benchmark.annot"); rm("m.benchmark.annot"); rm("benchmark.annot")
-rm("s.benchmark.master"); rm("m.benchmark.master"); rm("benchmark.master")
