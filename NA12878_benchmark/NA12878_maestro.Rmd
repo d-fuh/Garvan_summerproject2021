@@ -347,6 +347,8 @@ We will carry out this work later when we generate a bunch of split files.
 
 ## 6. Sandbox
 
+### maestro.small
+
 ```{r}
 subset(benchmark.annot.maestro, select=c("AnnotSV_ID",	"SV_chrom",	"SV_start",	"SV_end",	"SV_length",	"SV_type",	"Samples_ID",	"ID",	"REF",	"ALT",	"QUAL",	"FILTER",	"INFO", "CytoBand",	"Gene_name",	"Gene_count", "ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ","OMIM_morbid",	"OMIM_morbid_candidate","GnomAD_pLI",	"ExAC_pLI",	"AnnotSV_ranking_score",	"AnnotSV_ranking_criteria",	"ACMG_class",	"Coverage", "Caller")) -> maestro.small
 ```
@@ -471,19 +473,14 @@ subset(maestro.small, select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ
 --> No NA, beware of zeros
 ```{r}
 Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes all rows containing any NA
-```
 
-```{r}
 select(Z.mtx, -ExAC_misZ) -> Z.mtx
-```
 
-```{r}
 Z.mtx <- decostand(Z.mtx, method= "max")
-```
 
-```{r}
 round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ
 ```
+
 
 ```{r}
 # need to subsample...
@@ -513,74 +510,58 @@ MDS.xy <- data.frame(MDS.S$points) ## Sending the cartesian coordinates in MDS p
 ```
 
 
---> Send to new dummy df + assign factors of interest (e.g. Caller)
+--> Send coordinate to new dummy df + assign factors of interest (e.g. Caller)
+
 ```{r}
-# profile fill in to MDS-coordinate frame
-## How to ensure row-to-row match of profile?
-MDS.xy$Caller <- maestro.small$Caller
-MDS.xy$ACMG_class <- maestro.small$ACMG_class
-MDS.xy$ACMG_class <- maestro.small$SV_type
-MDS.xy$ACMG_class <- maestro.small$SV_length
+# precious codes
+MDS.xy$Caller = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"Caller"]
+
+MDS.xy$ACMG_class = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"ACMG_class"]
+
+MDS.xy$SV_type = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"SV_type"]
+
+MDS.xy$SV_length = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"SV_length"]
 ```
 
 
 --> Run MDS plot and annotate with factor levels 
 ```{r}
 # MDS: (1) By Caller
-ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point() +
+ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
   
   theme(axis.title = element_blank(),
-        panel.background = element_rect(fill = "grey22", colour = "black", size = 1),
+        panel.background = element_rect(fill = "grey15", colour = "black", size = 1),
         panel.grid.major = element_line(color = "grey30", size=0.1),
         panel.grid.minor = element_blank(),
         legend.text = element_text(size = 11), 
-        legend.title = element_text(size = 14),
-        legend.key = element_rect(fill = NA)) +
-  
-  guides(color = guide_legend(override.aes = list(size = 4.5)))
+        legend.title = element_text(size = 13.5),
+        legend.key = element_rect(fill = NA))
 
-ggsave("MDS_by_Caller_NA12878.png")
-
-# MDS: (2) By ACMG class of SV
-ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(aes(color = ACMG_class)) +
-  
-  theme(legend.key = element_rect(fill = NA),
-        legend.text = element_text(size = 11),
-        legend.title = element_text(size = 14),
-        axis.title = element_blank(),
-        panel.background = element_rect(fill = "grey97", colour = "black", size = 1),
-        panel.grid.major = element_line(color = "grey86", size=0.1),
-        panel.grid.minor = element_blank(),
-        #aspect.ratio = 7 / 9.9
-        ) +
-  
-  guides(color = guide_legend(override.aes = list(size = 3)))
-
-ggsave("MDS_by_ACMG_class_NA12878.png")
 ```
+
+
 ```{r}
-# MDS: (3) By SV length
-ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(aes(color = SV_length)) +
+# MDS: (2) By ACMG class of SV
+ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(aes(color = ACMG_class)) + theme_bw() +
   
-  theme(legend.key = element_rect(fill = NA),
+    theme(legend.key = element_rect(fill = NA),
         legend.text = element_text(size = 11),
-        legend.title = element_text(size = 14),
+        legend.title = element_text(size = 12),
         axis.title = element_blank(),
         panel.background = element_rect(fill = "grey97", colour = "black", size = 1),
         panel.grid.major = element_line(color = "grey86", size=0.1),
         panel.grid.minor = element_blank(),
-        #aspect.ratio = 7 / 9.9
-        ) +
-  
-  guides(color = guide_legend(override.aes = list(size = 3)))
+        aspect.ratio = 7 / 9.9
+        )
 
-ggsave("MDS_by_SV_length_NA12878.png")
+```
 
-# MDS: (4) By SV type
+```{r}
+# MDS: (3) By SV type
 ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point() +
   
   theme(axis.title = element_blank(),
-        panel.background = element_rect(fill = "grey22", colour = "black", size = 1),
+        panel.background = element_rect(fill = "grey17", colour = "black", size = 1),
         panel.grid.major = element_line(color = "grey30", size=0.1),
         panel.grid.minor = element_blank(),
         legend.text = element_text(size = 11),
@@ -588,8 +569,6 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point() +
         legend.key = element_rect(fill = NA)) +
   
   guides(color = guide_legend(override.aes = list(size = 4.5)))
-
-ggsave("MDS_by_SV_type_NA12878.png")
 ```
 
 [END MDS]
