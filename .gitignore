@@ -23,3 +23,5 @@ NA12878_benchmark/Figures/Previous_version/*.*
 # Maestro_scripts
 NA12878_benchmark/Maestro_scripts/maestro.full.csv
 NA12878_benchmark/Maestro_scripts/maestro.split.csv
+NA12878_benchmark/Maestro_scripts/AnnotSV_NA12878_delly.tsv
+NA12878_benchmark/Maestro_scripts/AnnotSV_NA12878_delly_split.tsv
