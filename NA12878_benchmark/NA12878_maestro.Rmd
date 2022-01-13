@@ -76,8 +76,8 @@ See R script "maestro_generation" to generate a fully-annotated "maestro" file c
 ```{r message=FALSE}
 library(tidyverse)
 library(vcfR)
-library(GenomicRanges)
 library(vegan)
+library(viridis)
 ```
 
 
@@ -483,8 +483,8 @@ round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ
 
 
 ```{r}
-# need to subsample. Last checked: Cap = 400
-Z.mtx[sample(nrow(Z.mtx), 400), ] -> Z.mtx.sample
+# need to subsample. Last checked: Cap = 600
+Z.mtx[sample(nrow(Z.mtx), 600), ] -> Z.mtx.sample
 ```
 
 
@@ -529,7 +529,7 @@ MDS.xy$SV_type = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)
 #### MDS sample plots
 ```{r}
 # MDS: (1) By Caller
-ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point() +
+ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey15", colour = "black", size = 1),
@@ -545,7 +545,9 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point() +
 
 ```{r}
 # MDS: (2) By ACMG class of SV
-ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(aes(color = ACMG_class)) + theme_bw() +
+ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() +
+  
+  scale_colour_viridis() +
   
     theme(legend.key = element_rect(fill = NA),
         legend.text = element_text(size = 11),
@@ -560,7 +562,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(aes(color = ACMG_class)) + theme_bw
 
 ```{r}
 # MDS: (3) By SV type
-ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point() +
+ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey17", colour = "black", size = 1),
