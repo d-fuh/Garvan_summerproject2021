@@ -426,9 +426,23 @@ Since they are Z scores .... known distribution (SND).
 #### Workflow
 
 --> Extract all ExAC data into numeric mtx
+```{r}
+subset(maestro.small, select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ")) -> MDS.mtx
+```
+
 --> Already standardised?
 --> No NA, beware of zeros
+```{r}
+MDS.mtx[complete.cases(MDS.mtx), ] -> MDS.mtx ## removes all rows containing any NA
+```
+
+
 --> Apply similarity measure (Euclidean first?)
+```{r}
+MDS.S <- metaMDS(MDS.mtx, distance = "euclidean", autotransform = FALSE, trace=FALSE)
+```
+
+
 --> S mtx
 
 
@@ -436,6 +450,7 @@ Since they are Z scores .... known distribution (SND).
 --> Obtain Cartesian coordinate in S_mtx
 --> Send to new dummy df + assign factors of interest (e.g. Caller)
 --> Run MDS plot and annotate with factor levels #
+
 
 
 
