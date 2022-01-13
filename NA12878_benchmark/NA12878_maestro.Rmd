@@ -38,8 +38,8 @@ rm(svtype)
     2) (Section 6 onwards using maestro.small) -20,000 <= SV_length <= 20,000 (bp)
     
 
-- TODO: Find gold standard NA12878 SV call set ("truth set")
-- TODO: Include supporting reads info
+- **TODO**: Find gold standard NA12878 SV call set ("truth set")
+- **TODO**: Include supporting reads info
 
 
 ```{r}
@@ -125,7 +125,7 @@ rm("sample_size")
 ```
 
 
-### 2-2. [ONGOING] Synthesising SV types to four simple SV events: {DEL, DUP, INS, INV}
+### 2-2. [LATER?] Synthesising SV types to four simple SV events: {DEL, DUP, INS, INV}
 
 
 
@@ -137,7 +137,7 @@ rm("sample_size")
 
 
 
-### 2-3. [ONGOING] Wrapping SV types with coverage level (Small, Medium, Large NA12878)
+### 2-3. Wrapping SV types with coverage level (Small, Medium, Large NA12878)
 
 ```{r message=FALSE}
 benchmark.annot.maestro %>%
@@ -525,9 +525,11 @@ MDS.xy$SV_length = maestro.small[match(row.names(MDS.xy), row.names(maestro.smal
 
 
 --> Run MDS plot and annotate with factor levels 
+
+#### MDS sample plots
 ```{r}
 # MDS: (1) By Caller
-ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
+ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point() +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey15", colour = "black", size = 1),
@@ -535,8 +537,9 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
         panel.grid.minor = element_blank(),
         legend.text = element_text(size = 11), 
         legend.title = element_text(size = 13.5),
-        legend.key = element_rect(fill = NA))
-
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5)))
 ```
 
 
@@ -552,8 +555,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(aes(color = ACMG_class)) + theme_bw
         panel.grid.major = element_line(color = "grey86", size=0.1),
         panel.grid.minor = element_blank(),
         aspect.ratio = 7 / 9.9
-        )
-
+        ) 
 ```
 
 ```{r}
@@ -564,8 +566,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point() +
         panel.background = element_rect(fill = "grey17", colour = "black", size = 1),
         panel.grid.major = element_line(color = "grey30", size=0.1),
         panel.grid.minor = element_blank(),
-        legend.text = element_text(size = 11),
-        legend.title = element_text(size = 14),
+        legend.title = element_text(size = 12),
         legend.key = element_rect(fill = NA)) +
   
   guides(color = guide_legend(override.aes = list(size = 4.5)))
