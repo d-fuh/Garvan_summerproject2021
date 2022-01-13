@@ -426,6 +426,7 @@ median(noSNV$SV_length)
 
 
 ```{r message=FALSE}
+# Note that in noSNV, maestro.small the SV calls were bounded to [-20000, 20000].
 ggplot(noSNV, aes(x=SV_type, y=SV_length, fill=SV_type)) + geom_boxplot() + scale_y_log10() +
   ylab("SV length") + xlab("SV type, excluding SNV and BND") +
   theme_bw()
@@ -436,14 +437,13 @@ ggsave("SV_length_vs_type_excluding_SNV_BND_NA12878.png")
 
 ```{r message=FALSE}
 # Want to know SV length dist. based on callers
+# Note that in noSNV, maestro.small the SV calls were bounded to [-20000, 20000].
 noSNV %>%
   ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + geom_boxplot() + scale_y_log10() +
     theme_bw()
 
 ggsave("SV_length_among_callers_NA12878.png")
 ```
-
-
 
 
 
@@ -473,36 +473,28 @@ subset(maestro.small, select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ
 Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes all rows containing any NA
 ```
 
-
-
-##### Check up the complete Z score matrix (Z.mtx)
 ```{r}
-Z.mtx %>%
-  ggplot(aes(x=ExAC_delZ)) + geom_density()
+select(Z.mtx, -ExAC_misZ) -> Z.mtx
+```
+
+```{r}
+Z.mtx <- decostand(Z.mtx, method= "max")
+```
+
+```{r}
+round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ
+```
+
+```{r}
+# need to subsample...
+Z.mtx[sample(nrow(Z.mtx), 200), ] -> Z.mtx.sample
 ```
 
 
-
---> Apply similarity measure (Euclidean first?) --> S mtx via vegan::metaMDS
+--> Apply similarity measure and MDS compression
 ```{r eval=FALSE}
-### CAUTION: FREEZES R
-MDS.S <- metaMDS(MDS.mtx, distance = "euclidean", autotransform = FALSE, trace=FALSE)
+MDS.S <- metaMDS(Z.mtx.sample, distance = "euclidean", autotransform = FALSE, trace = FALSE)
 ```
-
-
-##### Side-note: metaMDS runtime
-```{r eval=FALSE}
-# dim(MDS.mtx) = [7569, 5] for NA12878_full_annot file
-start.time <- Sys.time()
-
-
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-time.taken
-```
-
-
-How long is metaMDs taking? ....
 
 
 --> Check stress level of MDS
