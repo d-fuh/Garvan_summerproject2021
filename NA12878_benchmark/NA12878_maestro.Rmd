@@ -583,13 +583,13 @@ MDS.xy <- data.frame(MDS.S$points) ## Sending the cartesian coordinates in MDS p
 
 ```{r}
 # precious codes
-MDS.xy$Caller = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"Caller"]
+MDS.xy$Caller = large.full[match(row.names(MDS.xy), row.names(large.full)),"Caller"]
 
-MDS.xy$ACMG_class = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"ACMG_class"]
+MDS.xy$ACMG_class = large.full[match(row.names(MDS.xy), row.names(large.full)),"ACMG_class"]
 
-MDS.xy$SV_type = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"SV_type"]
+MDS.xy$SV_type = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_type"]
 
-#MDS.xy$SV_length = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)),"SV_length"]
+#MDS.xy$SV_length = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_length"]
 ```
 
 
@@ -600,17 +600,20 @@ MDS.xy$SV_type = maestro.small[match(row.names(MDS.xy), row.names(maestro.small)
 # MDS: (1) By Caller
 ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
   
-  scale_colour_manual(values = wes_palette("GrandBudapest2")) +
+  #scale_colour_manual(values = wes_palette("GrandBudapest2")) +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey15", colour = "black", size = 1),
-        panel.grid.major = element_line(color = "grey30", size=0.1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         legend.text = element_text(size = 11), 
         legend.title = element_text(size = 13.5),
         legend.key = element_rect(fill = NA)) +
   
-  guides(color = guide_legend(override.aes = list(size = 4.5)))
+  guides(color = guide_legend(override.aes = list(size = 4.5))) -> F6
+
+F6
 ```
 
 
@@ -625,10 +628,13 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() 
         legend.title = element_text(size = 12),
         axis.title = element_blank(),
         panel.background = element_rect(fill = "grey97", colour = "black", size = 1),
-        panel.grid.major = element_line(color = "grey86", size=0.1),
+        #panel.grid.major = element_line(color = "grey86", size=0.1),
+        panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         aspect.ratio = 7 / 9.9
-        ) 
+        ) -> F7
+
+F7
 ```
 
 ```{r}
@@ -636,16 +642,29 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() 
 ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
   
   theme(axis.title = element_blank(),
-        panel.background = element_rect(fill = "grey17", colour = "black", size = 1),
-        panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(),
         legend.title = element_text(size = 12),
         legend.key = element_rect(fill = NA)) +
   
-  guides(color = guide_legend(override.aes = list(size = 4.5)))
+  guides(color = guide_legend(override.aes = list(size = 4.5))) -> F8
+
+F8
 ```
 
 [END MDS]
+
+
+# Figures
+```{r}
+
+```
+
+
+
+
 
 
 
