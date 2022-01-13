@@ -8,7 +8,7 @@
 *.tsv.gz
 *.DS_Store
 
-# NA12878 main folder items
+# NA12878 main folder
 NA12878_benchmark/AnnotSV_vis_*.html
 NA12878_benchmark/*.nb.html
 NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv
@@ -16,13 +16,10 @@ NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv
 # AnnotSV visualisation files
 NA12878_benchmark/AnnotVis/*.*
 
-# Previous version items
-NA12878_benchmark/Version_previous/*.*
+# Items from previous version
+NA12878_benchmark/Version_previous/**/*.*
 NA12878_benchmark/Figures/Previous_version/*.*
-## back-up
-NA12878_benchmark/Version_previous/Version_*/*.*
-NA12878_benchmark/maestro.annot.csv
-NA12878_benchmark/AnnotSV_NA12878_delly_split.tsv
-NA12878_benchmark/maestro.split.csv
-NA12878_benchmark/maestro.full.csv
-NA12878_benchmark/old_version_master_generation_full.R
+
+# Maestro_scripts
+NA12878_benchmark/Maestro_scripts/maestro.full.csv
+NA12878_benchmark/Maestro_scripts/maestro.split.csv

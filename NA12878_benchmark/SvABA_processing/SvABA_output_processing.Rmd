@@ -1,0 +1,57 @@
+---
+title: "SvABA output processing"
+output: html_notebook
+---
+This is a workflow to process raw SvABA outputs (VCF) to prevent the header-column number mismatch error
+
+# 0. Download your VCF output from SvABA workflow (VCF)
+# 1. Bash
+```{bash}
+# grep the header element row
+grep "#CHROM" NA12878_small.svaba.sv.raw.vcf
+```
+
+
+```{bash}
+# replace old colnames with new
+## replace $long_name_to_be_replaced with $NewColName, usually sample name
+cat NA12878_small.svaba.sv.raw.vcf | awk '{gsub("FILTER\tINFO\tFORMAT\t/cromwell_root/gatk-test-data/wgs_bam/NA12878_24RG_hg38/NA12878_24RG_small.hg38.bam", "FILTER\tINFO\tFORMAT\tA\tB\tC\tNA12878_small")}1' > NA12878_small.svaba.sv.new.vcf
+```
+
+File names: Below are Bash-renamed VCF files
+
+- NA12878_small.svaba.sv.new.vcf
+- NA12878_med.svaba.sv.new.vcf
+- NA12878.svaba.sv.new.vcf
+
+
+# 2. R
+```{r}
+# load the new, renamed VCF file
+library(vcfR)
+
+to.be.cleaned.vcf <- read.vcfR("NA12878_small.svaba.sv.new.vcf")
+
+# eliminate the 3 problematic columns
+dim(to.be.cleaned.vcf@gt[, c(2:4)])
+to.be.cleaned.vcf@gt = to.be.cleaned.vcf@gt[, -c(2:4)]
+dim(to.be.cleaned.vcf@gt)
+
+# write the now cleaned vcf object into new VCF file to be used for benchmarking
+write.vcf(to.be.cleaned.vcf, "NA12878_small.svaba.vcf.gz")
+```
+
+
+**Note that the output file is compressed i.e. in vcf.gz format.**
+
+
+```{bash}
+# decompress first
+
+```
+
+```{r}
+# test output file
+test.vcf <- read.vcfR("NA12878.svaba.vcf")
+```
+

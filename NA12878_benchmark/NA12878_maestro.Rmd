@@ -155,6 +155,8 @@ benchmark.full %>%
     geom_errorbar(aes(ymin = mean.A-SE.A, ymax = mean.A+SE.A), width = 0.3, position = position_dodge(0.9)) +
     ylab("Count") + xlab("Chromosome") +
     theme_classic()
+
+ggsave2(filename = "SV_location_by_coverage_NA12878.png")
 ```
 
 We see that the pink column is the true graph we wanted in Section 1-1. We will generate it by
@@ -168,9 +170,9 @@ ggplot(aes(x = SV_chrom, fill=Caller)) +
     geom_bar() +
     theme_bw() +
     labs(x="Chromosome", y="count") + 
-    ggtitle("SV location by different callers in NA12878 using AnnotSV, AM = full") -> F1
+    ggtitle("SV location by different callers in NA12878 using AnnotSV, AM=full")
 
-F1
+ggsave2(filename = "SV_location_by_caller_NA12878_full.png")
 ```
 
 
@@ -191,11 +193,11 @@ ggplot(aes(x = svtype, fill=Caller)) +
     geom_bar() + #scale_y_log10() +
     theme_bw() +
     labs(x="Type of SV", y="count") +
-    ggtitle("Types of structural variants detected by different callers in NA12878") -> F2
+    ggtitle("Types of structural variants detected by different callers in NA12878")
+
+ggsave2("SV_type_by_caller_NA12878_full.png")
 
 rm("sample_size")
-
-F2
 ```
 
 
@@ -229,9 +231,9 @@ benchmark.full %>%
     geom_errorbar(aes(ymin = mean.A-SE.A, ymax = mean.A+SE.A), width = 0.3, position = position_dodge(0.9)) +
     ylab("Count") + xlab("SV Type") +
     theme_classic() +
-    ggtitle("SV types detected by various callers in NA12878") -> F3
+    ggtitle("SV types detected by various callers in NA12878")
 
-F3
+ggsave2("SV_type_by_caller_and_coverage_NA12878.png")
 ```
 
 
@@ -298,11 +300,11 @@ ggplot(aes(x = ACMG.class, fill=SV_type)) +
     geom_bar() +
     theme_bw() +
     labs(x="ACMG class", y="Count") +
-    ggtitle("ACMG class and SV type detected by various callers from NA12878, AM=full") -> F4.1
+    ggtitle("ACMG class and SV type detected by various callers from NA12878, AM=full")
+
+ggsave2("ACMG_class_and_SV_type_by_caller_NA12878_full.png")
 
 rm("sample_size")
-
-F4.1
 ```
 
 Try removing the NA rows:
@@ -314,9 +316,9 @@ ggplot(aes(x = ACMG_class, fill=SV_type)) +
     geom_bar() +
     theme_bw() +
     labs(x="ACMG class", y="count") +
-    ggtitle("ACMG class and SV type by callers from NA12878, excluding NA. AM=full") -> F4.2
+    ggtitle("ACMG class and SV type by callers from NA12878, excluding NA. AM=full")
 
-F4.2
+ggsave2("ACMG_class_by_SV_type_and_caller_NA12878_full_exc_NA.png")
 ```
 
 
@@ -333,11 +335,11 @@ ggplot(aes(x = ACMG.class, fill=SV_type)) +
     geom_bar() +
     theme_bw() +
     labs(x="ACMG class", y="count") +
-    ggtitle("ACMG class and SV type detected by various callers in NA12878, AM=split") -> F4.3
+    ggtitle("ACMG class and SV type detected by various callers in NA12878, AM=split")
+
+ggsave2("ACMG_class_and_SV_type_by_caller_NA12878_split.png")
 
 rm("sample_size")
-
-F4.3
 ```
 
 We see that full=NA entries were mostly INV called by SvABA.
@@ -350,9 +352,9 @@ ggplot(aes(x = ACMG_class, fill=SV_type)) +
     geom_bar() +
     theme_bw() +
     labs(x="ACMG class", y="count") +
-    ggtitle("ACMG class and SV type by callers from NA12878, excluding NA. AM=split") -> F4.4
+    ggtitle("ACMG class and SV type by callers from NA12878, excluding NA. AM=split")
 
-F4.4
+ggsave2("ACMG_class_and_SV_type_by_caller_NA12878_split_exc_NA.png")
 ```
 
 
@@ -400,11 +402,11 @@ ggplot(aes(x = topos, fill=SV_type)) +
     geom_bar() + scale_y_sqrt() +
     theme_bw() +
     labs(x="Gene topology", y="Count") +
-    ggtitle("CDS-affecting SV type and variant topology from NA12878, AM=split") -> F5
+    ggtitle("CDS-affecting SV type and variant topology from NA12878, AM=split")
+
+ggsave2("CDS_affecting_SV_type_and_topology_NA12878.png")
 
 rm("sample_size")
-
-F5
 ```
 
 > Q: Why is the count (y)-axis inaccurate?
@@ -611,9 +613,11 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
         legend.title = element_text(size = 13.5),
         legend.key = element_rect(fill = NA)) +
   
-  guides(color = guide_legend(override.aes = list(size = 4.5))) -> F6
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by variant caller from NA12878, n=600")
 
-F6
+ggsave2("MDS_ExAC_Z_by_caller_NA12878.png")
 ```
 
 
@@ -630,11 +634,12 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() 
         panel.background = element_rect(fill = "grey97", colour = "black", size = 1),
         #panel.grid.major = element_line(color = "grey86", size=0.1),
         panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank(),
-        aspect.ratio = 7 / 9.9
-        ) -> F7
+        panel.grid.minor = element_blank()
+        ) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by ACMG class from NA12878, n=600")
 
-F7
+ggsave2("MDS_ExAC_Z_by_ACMG_class_NA12878.png")
 ```
 
 ```{r}
@@ -649,19 +654,14 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
         legend.title = element_text(size = 12),
         legend.key = element_rect(fill = NA)) +
   
-  guides(color = guide_legend(override.aes = list(size = 4.5))) -> F8
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by SV type from NA12878, n=600")
 
-F8
+ggsave2("MDS_ExAC_Z_by_SV_type_NA12878.png")
 ```
 
 [END MDS]
-
-
-# Figures
-```{r}
-
-```
-
 
 
 
