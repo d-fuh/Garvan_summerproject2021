@@ -1,8 +1,8 @@
 ---
 title: "Benchmarking Structural Variant Callers using WGS data from NA12878"
+version: "1.0"
 date: "01-08-2022"
 ---
-***Version 1.0***
 
 This task benchmarks the five structural variant callers used (Delly, Manta, Melt, SvABA, and Wham) on Illumina-based WGS data from NA12878.
 
