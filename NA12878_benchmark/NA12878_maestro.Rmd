@@ -55,17 +55,24 @@ rm(benchmark.annot)
 
 - See tabs with [ONGOING] in the header for items currently still being worked on. They include:
 
-    1. SV_length: Suspect confounder in the AM=split set. Try filter between(SV_length, -20000, 20000) and see if any interesting difference occurs.
-    
-    2. Creating a SV aggregation workflow with relaxed criteria
-    3. Remaining items in #TO-DO
+    1. Creating a SV aggregation workflow with relaxed criteria
+    2. Remaining items in #TO-DO
 
 
 ## TO-DO
 
 - **TODO**: Find gold standard NA12878 SV call set ("truth set")
 - **TODO**: Include supporting reads info
-- **TODO**: Assign figure numbers to each (important) figures to export (ggsave bug)
+
+
+## Questions to be solved
+
+Highlight "> Q" in the document to look for unanswered questions.
+
+    1. Does massively-sized SV calls confound any of our results here? Why or why not?
+    
+    2. Why were there calls made on the Y chromosome, when NA12878 is known to be female?
+
 
 
 
@@ -106,6 +113,14 @@ library(wesanderson) ## optional
 
 
 ## Analysis
+
+## Section I. [w/o reference] Caller against Caller set {Delly, Manta, SvABA, Wham, Melt}.
+
+### 0. [ONGOING] Coverage as a measure of call confidence
+
+> The read count is used as a proxy for quality when quality score is not reported. Some callers report all calls and stratify them into pass (which can be considered as high confidence) and non-pass (low confidence), while others report only pass calls.^[1]
+
+
 
 ### 1. SV call location across NA12878 by different callers
 
@@ -207,7 +222,7 @@ rm("sample_size")
 ```
 
 
-#### 2-2. [LATER?] Synthesising SV types to four simple SV events: {DEL, DUP, INS, INV}
+#### 2-2. [OPTIONAL] Synthesising SV types to four simple SV events: {DEL, DUP, INS, INV}
 
 
 
@@ -441,6 +456,22 @@ rm("sample_size")
           filter(Known to affect XX tissue)
           [This task]
 
+```{r}
+# check ACMG vs ACMG_class
+table(as.factor(large.split$ACMG))
+table(as.factor(large.split$ACMG_class))
+```
+
+
+```{r}
+large.split %>% filter(ACMG_class %in% c("full=4", "full=5")) %>% ## select pathogenic variants 
+  filter(Caller_count >= 3) %>% ## TODO new variable we will introduce at section 3
+  filter(Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>% ## CDS-affecting
+  filter(Tissue == "which") -> elite.variants.which ## TODO new variable to introduce at the end of (last) section 5-1
+```
+
+
+
 
 [TBC]
 
@@ -448,6 +479,7 @@ rm("sample_size")
 
 ### 6. SV length by caller
 
+#### 6-1. SV length by caller, no restriction
 ```{r}
 boxplot(data = large.full, SV_length ~ Caller)
 ```
@@ -480,6 +512,7 @@ First look:
 
 Now, we look at whether to limit our SV call set by size or not:
 
+
 #### Limiting SV call size
 ```{r}
 # need to clean NA/0 entries first
@@ -508,6 +541,9 @@ Seems like when putting SvABA aside, Melt has very high precision in calling sma
 
 On the other hand, Delly, Manta, and Wham seems to call much larger variants (even when prefiltered to size < 20 kb). So far it's consistent with our previous analysis:
 
+
+#### 6-2. SV length by caller, under 20 kb
+
 ```{r}
 # using sized SV set
 sizedSVs %>%
@@ -520,9 +556,9 @@ ggsave2("SV_length_by_callers_NA12878_box_sized.png")
 
 
 
-
-
 Let's dig further:
+
+#### 6-3. SV length by caller, under 20 kb, across chromosomes
 ```{r}
 # Q: How does SV length vary across Callers?
 
@@ -533,9 +569,27 @@ ggplot(noNAlengthSV,
 ## sized SVs
 ggplot(sizedSVs, 
        aes(SV_chrom, SV_length, color=Caller)) + geom_point() + ylab("SV length (limited to < 20kb)") + xlab("chromosome")
+
+ggsave2("SV_length_under_20kb_by_caller_across_chromosomes_NA12878.png")
+```
+
+#### 6-4. ANOVA: SV length by caller, under 20 kb
+```{r}
+aov(data=sizedSVs, SV_length ~ Caller) %>%
+  summary()
+
+plot(aov(data=sizedSVs, SV_length ~ Caller))
 ```
 
 
+```{r}
+mutate(sizedSVs, SV_length_proper = log10(0.5*(SV_length+mean(SV_length)))) -> sizedSVs
+
+aov(data=sizedSVs, SV_length_proper ~ Caller) %>%
+  summary()
+
+plot(aov(data=sizedSVs, SV_length_proper ~ Caller))
+```
 
 
 
@@ -736,6 +790,29 @@ ggsave2("MDS_ExAC_Z_by_location_NA12878.png")
 ```
 
 
+## Section II. [w/ reference] Caller set {Delly, Manta, SvABA, Wham, Melt} against Gold Standard (NA12878 truth set)
+
+### 1. [ONGOING] Precision, Recall, and FPR
+
+#### Definition of terms
+
+    - Precision = 1 - false discovery rate = 1 - FPR
+    
+    - Recall = 
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -748,6 +825,11 @@ subset(benchmark.full,
        
        select=c("AnnotSV_ID",	"SV_chrom",	"SV_start",	"SV_end",	"SV_length",	"SV_type",	"Samples_ID",	"ID",	"REF",	"ALT",	"QUAL",	"FILTER",	"INFO", "CytoBand",	"Gene_name",	"Gene_count", "ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ","OMIM_morbid",	"OMIM_morbid_candidate","GnomAD_pLI",	"ExAC_pLI",	"AnnotSV_ranking_score",	"AnnotSV_ranking_criteria",	"ACMG_class",	"Coverage", "Caller")) -> maestro.small
 ```
+
+
+# Footnotes
+
+1. Reference: Cameron, D. L., et al. (2019). "Comprehensive evaluation and characterisation of short read general-purpose structural variant calling software." Nature Communications 10(1): 3240.
 
 
 
