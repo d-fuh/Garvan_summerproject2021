@@ -116,9 +116,16 @@ library(wesanderson) ## optional
 
 ## Section I. [w/o reference] Caller against Caller set {Delly, Manta, SvABA, Wham, Melt}.
 
-### 0. [ONGOING] Coverage as a measure of call confidence
+### 0. Coverage as a measure of call confidence
 
 > The read count is used as a proxy for quality when quality score is not reported. Some callers report all calls and stratify them into pass (which can be considered as high confidence) and non-pass (low confidence), while others report only pass calls.^[1]
+
+
+In this case, all of our callers benchmarked reported each call with PASS/lowQUAL/...other measures, as described previously, we filtered those only reported with the "PASS" status.
+
+The read count / coverage factors are therefore considered uniform in the following analyses.
+
+NB: "Coverage" was assigned as a new categorical variable to represent "from which genome subset of NA12878" the call was made. There are three levels: "Small", "Med", and "Large" (the full set).
 
 
 
