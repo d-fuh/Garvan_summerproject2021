@@ -446,85 +446,101 @@ rm("sample_size")
 
 
 
-### 6. Sandbox
-
-#### maestro.small
+### 6. SV length by caller
 
 ```{r}
-subset(benchmark.full, select=c("AnnotSV_ID",	"SV_chrom",	"SV_start",	"SV_end",	"SV_length",	"SV_type",	"Samples_ID",	"ID",	"REF",	"ALT",	"QUAL",	"FILTER",	"INFO", "CytoBand",	"Gene_name",	"Gene_count", "ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ","OMIM_morbid",	"OMIM_morbid_candidate","GnomAD_pLI",	"ExAC_pLI",	"AnnotSV_ranking_score",	"AnnotSV_ranking_criteria",	"ACMG_class",	"Coverage", "Caller")) -> maestro.small
-```
-
-Later, we can eliminate column with all NA by "some method". Note this is largely due to Annotation_mode =="full".
-
-
----------------------------------------------------------IGNORE BELOW CODE-------------------------------------------------------
-
-### 6-2. SV length ~ Coverage/Caller: ANOVA
-
-#### Filtering based on size
-
-There are some massive SVs reported by Delly...should we remove them?
-```{r}
-maestro.small %>%
-  filter(between(SV_length, -20000, 20000)) -> maestro.small
-```
-
-```{r}
-range(maestro.small$SV_length)
+boxplot(data = large.full, SV_length ~ Caller)
 ```
 
 
-> NB: SvABA reported mostly indels...of course (called "BND") (Check yourself with SV_start & SV_end)
-> These calls has SV_length == NA, which is problematic
-> Need filter
-
-
-```{r message=FALSE}
-maestro.small %>%
-  filter(!is.na(SV_length)) %>%
-  filter(SV_length > 1) %>% ## ignoring SNV/BND
-  ggplot(aes(x=log10(SV_length))) + geom_histogram(binwidth = 0.05) + xlab("log SV length excluding SNV/BND")
+```{r}
+boxplot(log1p(large.full$SV_length) ~ large.full$Caller)
 ```
 
 ```{r}
-maestro.small %>%
-  filter(!is.na(SV_length)) %>%
-  filter(SV_length > 1) %>% ## ignoring SNV/BND
-  ggplot(aes(x=SV_length)) + geom_histogram(binwidth = 0.05) + scale_x_log10() + xlab("SV length excluding SNV/BND") +
+# a nicer-looking alternative to the above plot
+large.full %>% filter(!is.na(SV_length)) %>%
+  filter(SV_length != 0) %>%
+  
+  ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + geom_boxplot() + 
+  theme_bw() + scale_y_log10()
+
+ggsave2("SV_length_by_callers_NA12878_box.png")
+```
+
+First look: 
+
+
+- Delly has best QC (few outliers in comparison --- or were they filtered out?)
+- Manta has large outlier group (very large-sized SV calls)
+- Melt has high precision --- in comparison to other callers
+- Wham has considerable variance and overall similar call-range (in size) to Manta
+- SvABA is excluded due to its SNV-focused nature (?)
+
+
+Now, we look at whether to limit our SV call set by size or not:
+
+#### Limiting SV call size
+```{r}
+# need to clean NA/0 entries first
+large.full %>% filter(!is.na(SV_length)) %>%
+  filter(SV_length != 0) -> noNAlengthSV
+
+# need to limit SV length range
+sizedSVs <- noNAlengthSV %>% filter(between(SV_length, -20000, 20000))
+
+# check distribution again
+boxplot(data = sizedSVs, SV_length ~ Caller)
+
+# apply transform
+boxplot(log1p(sizedSVs$SV_length) ~ sizedSVs$Caller)
+
+# suspect Melt calls a lot of small SVs (ALU, LINE1, SVA) --- cf. Chunk/Figure 2-1
+sizedSVs %>% filter(Caller == "Melt") %>%
+  ggplot(aes(x=SV_length)) + geom_histogram() + ggtitle("Of those of |size| < 20 kb, SV length called by Melt in NA12878");
+
+table(filter(sizedSVs, Caller == "Melt")$SV_length)
+
+# in fact, those called by Melt of size < 20kb are mostly in (mean) size 280 bp! --- not *that* small
+```
+
+Seems like when putting SvABA aside, Melt has very high precision in calling smaller SVs --- still of considerable mean size ~ 280 bp.
+
+On the other hand, Delly, Manta, and Wham seems to call much larger variants (even when prefiltered to size < 20 kb). So far it's consistent with our previous analysis:
+
+```{r}
+# using sized SV set
+sizedSVs %>%
+  
+  ggplot(aes(x=Caller, y=log10(0.5*(SV_length+mean(SV_length))), fill=Caller)) + geom_boxplot() + 
   theme_bw()
+
+ggsave2("SV_length_by_callers_NA12878_box_sized.png")
 ```
 
+
+
+
+
+Let's dig further:
 ```{r}
-# ignoring SNV/BND
-maestro.small %>%
-  filter(!is.na(SV_length)) %>%
-  filter(SV_length > 1) -> noSNV
+# Q: How does SV length vary across Callers?
 
-mean(noSNV$SV_length)
-median(noSNV$SV_length)
+## original (unlimited) call set
+ggplot(noNAlengthSV, 
+       aes(SV_chrom, SV_length, color=Caller)) + geom_point()
+
+## sized SVs
+ggplot(sizedSVs, 
+       aes(SV_chrom, SV_length, color=Caller)) + geom_point() + ylab("SV length (limited to < 20kb)") + xlab("chromosome")
 ```
 
 
-```{r message=FALSE}
-# Note that in noSNV, maestro.small the SV calls were bounded to [-20000, 20000].
-ggplot(noSNV, aes(x=SV_type, y=SV_length, fill=SV_type)) + geom_boxplot() + scale_y_log10() +
-  ylab("SV length") + xlab("SV type, excluding SNV and BND") +
-  theme_bw() +
-  ggtitle("SV_length_vs_type_excluding_SNV_BND_NA12878")
-```
 
 
-```{r message=FALSE}
-# Want to know SV length dist. based on callers
-# Note that in noSNV, maestro.small the SV calls were bounded to [-20000, 20000].
-noSNV %>%
-  ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + geom_boxplot() + scale_y_log10() +
-    theme_bw() + ggtitle("SV_length_among_callers_NA12878.png")
-```
 
----------------------------------------------------------IGNORE ABOVE CODE-------------------------------------------------------
 
-### 6-3. ExAC Z scores: MDS, colour by Coverage/Caller
+### 7. nMDS-ExAC Z scores: A bundled measure of functional constraints per gene
 
 The ExAC Z scores (read more at where?) are:
 
@@ -605,7 +621,7 @@ MDS.xy$SV_chrom = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV
 
 --> Run MDS plot and annotate with factor levels 
 
-#### MDS sample plots
+#### 7-1. ExACZ ~ Caller
 ```{r}
 # MDS: (1) By Caller
 ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
@@ -628,7 +644,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
 ggsave2("MDS_ExAC_Z_by_caller_NA12878.png")
 ```
 
-
+#### 7-2. ExACZ ~ ACMG class
 ```{r}
 # MDS: (2) By ACMG class of SV
 MDS.xy$ACMG_class <- as.factor(MDS.xy$ACMG_class) ## coerce as factor level (discrete) instead of numeric (continuous)
@@ -655,7 +671,7 @@ ggsave2("MDS_ExAC_Z_by_ACMG_class_discrete_NA12878.png")
 ```
 
 
-
+#### 7-3. ExACZ ~ SV type
 ```{r}
 # MDS: (3) By SV type
 ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
@@ -675,7 +691,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
 ggsave2("MDS_ExAC_Z_by_SV_type_NA12878.png")
 ```
 
-
+#### [DITCHED] 7-4. ExACZ ~ SV length
 ```{r}
 # MDS: (4) By SV length
 MDS.xy %>% filter(!is.na(SV_length)) %>% mutate(SV_length = log1p(SV_length)) %>%
@@ -699,9 +715,9 @@ ggplot(aes(MDS1, MDS2, colour = SV_length)) + geom_point(size = 1) +
 #ggsave2("MDS_ExAC_Z_by_SV_length_NA12878.png")
 ```
 
-
+#### 7-5. ExACZ ~ variant location
 ```{r}
-# MDS: (5) By Gene topology
+# MDS: (5) By variant location
 ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
   
   theme(axis.title = element_blank(),
@@ -719,9 +735,19 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
 ggsave2("MDS_ExAC_Z_by_location_NA12878.png")
 ```
 
-[END MDS]
 
 
+
+
+# Sandbox
+
+## maestro.small: Small subset of benchmark.full / large.full, etc
+
+```{r}
+subset(benchmark.full, 
+       
+       select=c("AnnotSV_ID",	"SV_chrom",	"SV_start",	"SV_end",	"SV_length",	"SV_type",	"Samples_ID",	"ID",	"REF",	"ALT",	"QUAL",	"FILTER",	"INFO", "CytoBand",	"Gene_name",	"Gene_count", "ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ","OMIM_morbid",	"OMIM_morbid_candidate","GnomAD_pLI",	"ExAC_pLI",	"AnnotSV_ranking_score",	"AnnotSV_ranking_criteria",	"ACMG_class",	"Coverage", "Caller")) -> maestro.small
+```
 
 
 
