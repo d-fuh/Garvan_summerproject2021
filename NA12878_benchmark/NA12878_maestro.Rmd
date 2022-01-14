@@ -98,6 +98,7 @@ You should only see one level in the two data frames tested --- "PASS".
 
 ```{r message=FALSE}
 library(tidyverse)
+library(cowplot)
 library(vegan)
 library(viridis)
 library(wesanderson) ## optional
@@ -598,7 +599,7 @@ MDS.xy$SV_type = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_
 
 #MDS.xy$SV_length = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_length"]
 
-#MDS.xy$Topology = large.full[match(row.names(MDS.xy), row.names(large.split)),"Location2"]
+MDS.xy$SV_chrom = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_chrom"]
 ```
 
 
@@ -622,7 +623,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
   
   guides(color = guide_legend(override.aes = list(size = 4.5))) +
   
-  ggtitle("NMDS plot of five ExAC Z scores grouped by variant caller from NA12878, n=600")
+  ggtitle("NMDS plot of five ExAC Z scores grouped by variant caller from NA12878 (n=600)")
 
 ggsave2("MDS_ExAC_Z_by_caller_NA12878.png")
 ```
@@ -630,9 +631,11 @@ ggsave2("MDS_ExAC_Z_by_caller_NA12878.png")
 
 ```{r}
 # MDS: (2) By ACMG class of SV
+MDS.xy$ACMG_class <- as.factor(MDS.xy$ACMG_class) ## coerce as factor level (discrete) instead of numeric (continuous)
+
 ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() +
   
-  scale_colour_viridis() +
+  scale_colour_viridis(discrete = TRUE) +
   
     theme(legend.key = element_rect(fill = NA),
         legend.text = element_text(size = 11),
@@ -642,12 +645,16 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() 
         #panel.grid.major = element_line(color = "grey86", size=0.1),
         panel.grid.major = element_blank(),
         panel.grid.minor = element_blank()
-        ) +
+        ) + 
   
-  ggtitle("NMDS plot of five ExAC Z scores grouped by ACMG class from NA12878, n=600")
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by ACMG class from NA12878 (n=600)")
 
-ggsave2("MDS_ExAC_Z_by_ACMG_class_NA12878.png")
+ggsave2("MDS_ExAC_Z_by_ACMG_class_discrete_NA12878.png")
 ```
+
+
 
 ```{r}
 # MDS: (3) By SV type
@@ -663,7 +670,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
   
   guides(color = guide_legend(override.aes = list(size = 4.5))) +
   
-  ggtitle("NMDS plot of five ExAC Z scores grouped by SV type from NA12878, n=600")
+  ggtitle("NMDS plot of five ExAC Z scores grouped by SV type from NA12878 (n=600)")
 
 ggsave2("MDS_ExAC_Z_by_SV_type_NA12878.png")
 ```
@@ -671,7 +678,7 @@ ggsave2("MDS_ExAC_Z_by_SV_type_NA12878.png")
 
 ```{r}
 # MDS: (4) By SV length
-MDS.xy %>% mutate(SV_length = log1p(SV_length)) %>%
+MDS.xy %>% filter(!is.na(SV_length)) %>% mutate(SV_length = log1p(SV_length)) %>%
 
 ggplot(aes(MDS1, MDS2, colour = SV_length)) + geom_point(size = 1) +
   
@@ -695,9 +702,7 @@ ggplot(aes(MDS1, MDS2, colour = SV_length)) + geom_point(size = 1) +
 
 ```{r}
 # MDS: (5) By Gene topology
-ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(color = Topology, size = 1) +
-  
-  scale_colour_viridis(option = "B") +
+ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
@@ -709,9 +714,9 @@ ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(color = Topology, size = 1) +
   
   guides(color = guide_legend(override.aes = list(size = 4.5))) +
   
-  ggtitle("NMDS plot of five ExAC Z scores as measure of functional constraint \n grouped by gene topology from NA12878, n=600")
+  ggtitle("NMDS plot of five ExAC Z scores as measure of functional constraint \n grouped by chromosomal location from NA12878  (n=600)")
 
-#ggsave2("MDS_ExAC_Z_by_topology_NA12878.png")
+ggsave2("MDS_ExAC_Z_by_location_NA12878.png")
 ```
 
 [END MDS]
