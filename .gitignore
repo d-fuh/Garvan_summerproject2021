@@ -11,7 +11,6 @@
 # NA12878 main folder
 NA12878_benchmark/AnnotSV_vis_*.html
 NA12878_benchmark/*.nb.html
-NA12878_benchmark/AnnotSV_NA12878_delly_split_mode.tsv
 
 # AnnotSV visualisation files
 NA12878_benchmark/AnnotVis/*.*
@@ -23,5 +22,5 @@ NA12878_benchmark/Figures/Previous_version/**/*.*
 # Maestro_scripts
 NA12878_benchmark/Maestro_scripts/maestro.full.csv
 NA12878_benchmark/Maestro_scripts/maestro.split.csv
-NA12878_benchmark/Maestro_scripts/AnnotSV_NA12878_delly.tsv
-NA12878_benchmark/Maestro_scripts/AnnotSV_NA12878_delly_split.tsv
+NA12878_benchmark/Maestro_scripts/**/AnnotSV_NA12878_delly.tsv
+NA12878_benchmark/Maestro_scripts/**/AnnotSV_NA12878_delly_split.tsv
