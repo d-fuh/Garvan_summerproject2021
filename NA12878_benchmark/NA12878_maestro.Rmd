@@ -697,6 +697,7 @@ MDS.xy <- data.frame(MDS.S$points) ## Sending the cartesian coordinates in MDS p
 
 --> Send coordinate to new dummy df + assign factors of interest (e.g. Caller)
 
+#### Assigning factors: Great code
 ```{r}
 # precious codes
 MDS.xy$Caller = large.full[match(row.names(MDS.xy), row.names(large.full)),"Caller"]
@@ -849,6 +850,84 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
 
 ggsave2("MDS_ExAC_Z_by_location_NA12878.png")
 ```
+
+
+### 8. PCA:
+
+#### 8-1. ExAC_Z continued: ACMG score and ExAC Z measure of functional constraint
+```{r}
+# using entire data frame instead of subsample as in MDS restrictions
+Z.pca <- princomp(Z.mtx)
+```
+
+```{r}
+# first-stage analysis
+plot(Z.pca$scores) ## shows visuals of what first two PCs look like. can specify which = c(a,b)
+screeplot(Z.pca) ## %var explained by each PC
+summary(Z.pca) ## important statistics of each PC, mostly %var accounted
+loadings(Z.pca) ## "loadings" in PCA refers to the linear (de)composition of each PC
+```
+
+Select PC1,2 = ~ 80%; PC1,2,3 = ~ 91% (Quite low!)
+
+#### 2D PCA (80%)
+```{r}
+# PCA plot: 2D
+Z.coor <- data.frame(Z.pca$scores)
+
+# assigning factors
+Z.coor$Caller = large.full[match(row.names(Z.coor), row.names(large.full)),"Caller"]
+Z.coor$ACMG_class = large.full[match(row.names(Z.coor), row.names(large.full)),"ACMG_class"]
+Z.coor$SV_type = large.full[match(row.names(Z.coor), row.names(large.full)),"SV_type"]
+```
+
+
+```{r}
+# Plot 2D PCA
+## by SV type
+ggplot(Z.coor) + aes(Comp.1, Comp.2, color=SV_type) + geom_point() +
+   theme_bw()
+
+## by Caller
+ggplot(Z.coor) + aes(Comp.1, Comp.2, color=Caller) + geom_point() +
+   theme_bw()
+
+## by ACMG class
+Z.coor$ACMG_class <- as.factor(Z.coor$ACMG_class) ## discrete leveling
+
+ggplot(Z.coor) + aes(Comp.1, Comp.2, color=ACMG_class) + geom_point() +
+  scale_colour_viridis(discrete = TRUE) +
+   theme_bw()
+```
+
+
+Consider subsample to n=600:
+
+#### Subsampling: n=600
+```{r}
+# sample down to n=600
+Z.coor[sample(nrow(Z.coor), 600), ] -> Z.pca.sample
+
+# Plot 2D PCA
+## by SV type
+ggplot(Z.pca.sample) + aes(Comp.1, Comp.2, color=SV_type) + geom_point() +
+   theme_bw()
+
+## by Caller
+ggplot(Z.pca.sample) + aes(Comp.1, Comp.2, color=Caller) + geom_point() +
+   theme_bw()
+
+## by ACMG class
+ggplot(Z.pca.sample) + aes(Comp.1, Comp.2, color=ACMG_class) + geom_point() +
+  scale_colour_viridis(discrete = TRUE) +
+   theme_bw()
+```
+
+
+
+
+
+
 
 
 ## Section II. [w/ reference] Caller set {Delly, Manta, SvABA, Wham, Melt} against Gold Standard (NA12878 truth set)
