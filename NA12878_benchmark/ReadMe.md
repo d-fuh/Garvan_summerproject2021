@@ -1,10 +1,18 @@
 ---
 title: "Benchmarking Structural Variant Callers using WGS data from NA12878"
 version: "1.0"
-date: "01-08-2022"
+date: "01-14-2022"
 ---
 
 This task benchmarks the five structural variant callers used (Delly, Manta, Melt, SvABA, and Wham) on Illumina-based WGS data from NA12878.
+
+# Current Working Notes
+version 1.0
+
+- Complete the Rmd
+- Aim to partition Rmd tasks into individual scripts
+- Obtain truth set of NA12878 calls to benchmark complete Section II
+
 
 # Data processing
 
@@ -27,5 +35,10 @@ Every SV are reported, even those not covering a gene. This type of annotation g
 
 - An annotation of the SV “split” by gene:
 This type of annotation gives an opportunity to focus on each gene overlapped by the SV. Thus, when a SV spans over several genes, the output will contain as many annotations lines as covered genes (cf example in FAQ). This latter annotation is extremely powerful to shorten the identification of mutation implicated in a specific gene.
+
+
+# Table of Contents
+
+
 
 [TBC]
