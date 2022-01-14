@@ -123,6 +123,12 @@ library(wesanderson) ## optional
 
 In this case, all of our callers benchmarked reported each call with PASS/lowQUAL/...other measures, as described previously, we filtered those only reported with the "PASS" status.
 
+```{r}
+hist(as.numeric(large.full$QUAL))
+```
+
+
+
 The read count / coverage factors are therefore considered uniform in the following analyses.
 
 NB: "Coverage" was assigned as a new categorical variable to represent "from which genome subset of NA12878" the call was made. There are three levels: "Small", "Med", and "Large" (the full set).
@@ -442,6 +448,23 @@ rm("sample_size")
 
 
 
+```{r}
+# try facet_wrap
+filter(large.split, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>%
+  ggplot() + aes(x = SV_type, fill=SV_type) + scale_y_sqrt() +
+    geom_bar() + 
+    facet_wrap( ~Location2) +
+    theme_bw() +
+    labs(x="Gene topology", y="Count") +
+    ggtitle("CDS-affecting SV type and variant topology from NA12878, AM=split")
+
+ggsave2("CDS_affecting_SV_type_and_topology_NA12878_wrapped.png")
+```
+
+
+
+
+
 #### 5-2. [ONGOING] The elite list
 
 <1st layer: AnnotSV input>
@@ -578,6 +601,14 @@ ggplot(sizedSVs,
        aes(SV_chrom, SV_length, color=Caller)) + geom_point() + ylab("SV length (limited to < 20kb)") + xlab("chromosome")
 
 ggsave2("SV_length_under_20kb_by_caller_across_chromosomes_NA12878.png")
+
+
+## try facet_wrap
+ggplot(sizedSVs, 
+       aes(SV_chrom, SV_length, color=Caller)) + geom_point() + ylab("SV length (limited to < 20kb)") + xlab("chromosome") +
+  facet_wrap( ~Caller, ncol = 1)
+
+ggsave2("SV_length_under_20kb_by_caller_across_chromosomes_NA12878_wrapped.png")
 ```
 
 #### 6-4. ANOVA: SV length by caller, under 20 kb
@@ -751,6 +782,29 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
 
 ggsave2("MDS_ExAC_Z_by_SV_type_NA12878.png")
 ```
+
+```{r}
+# Try facet_wrap
+ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  facet_wrap( ~SV_type)
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by SV type from NA12878 (n=600)")
+
+ggsave2("MDS_ExAC_Z_by_SV_type_NA12878_wrapped.png")
+```
+
+
 
 #### [DITCHED] 7-4. ExACZ ~ SV length
 ```{r}
