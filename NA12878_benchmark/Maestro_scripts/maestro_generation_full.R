@@ -105,7 +105,7 @@ join(s.benchmark.annot, m.benchmark.annot, type = "full") %>%
 
 detach("package:plyr", unload = TRUE)
 
-#write.csv(benchmark.full, "maestro.full.csv")
+write.csv(benchmark.full, "maestro.full.csv")
 
 # clear intermediate files
 rm("s.benchmark.annot"); rm("m.benchmark.annot"); rm("benchmark.annot")

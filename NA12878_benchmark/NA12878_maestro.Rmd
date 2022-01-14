@@ -77,6 +77,13 @@ See ReadME.md.
 
 # Main 
 
+## Data import
+```{r}
+benchmark.full <- read.csv("Maestro_scripts/maestro.full.csv")
+benchmark.split <- read.csv("Maestro_scripts/maestro.split.csv")
+```
+
+
 Before you start, run:
 ```{r}
 # always double-check
@@ -91,7 +98,6 @@ You should only see one level in the two data frames tested --- "PASS".
 
 ```{r message=FALSE}
 library(tidyverse)
-library(vcfR)
 library(vegan)
 library(viridis)
 library(wesanderson) ## optional
@@ -105,7 +111,6 @@ library(wesanderson) ## optional
 ```{r}
 # Reordering SV_chrom axis
 benchmark.full$SV_chrom <- factor(benchmark.full$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
-
 ```
 
 > Q: Explain recordings in the Y chromosome.
@@ -547,7 +552,7 @@ Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes all rows containing any NA
 
 #select(Z.mtx, -ExAC_misZ) -> Z.mtx
 
-Z.mtx <- decostand(Z.mtx, method= "max")
+#Z.mtx <- decostand(Z.mtx, method= "max") ## TODO: proper std option? omittable?
 
 round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ
 ```
@@ -561,7 +566,7 @@ Z.mtx[sample(nrow(Z.mtx), 600), ] -> Z.mtx.sample
 
 --> Apply similarity measure and MDS compression
 ```{r eval=FALSE}
-MDS.S <- metaMDS(Z.mtx.sample, distance = "euclidean", autotransform = FALSE, trace = FALSE)
+MDS.S <- metaMDS(Z.mtx.sample, distance = "euclidean", autotransform = FALSE, trace = FALSE) ##TODO: proper distance measure?
 ```
 
 
@@ -592,6 +597,8 @@ MDS.xy$ACMG_class = large.full[match(row.names(MDS.xy), row.names(large.full)),"
 MDS.xy$SV_type = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_type"]
 
 #MDS.xy$SV_length = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_length"]
+
+#MDS.xy$Topology = large.full[match(row.names(MDS.xy), row.names(large.split)),"Location2"]
 ```
 
 
@@ -659,6 +666,52 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
   ggtitle("NMDS plot of five ExAC Z scores grouped by SV type from NA12878, n=600")
 
 ggsave2("MDS_ExAC_Z_by_SV_type_NA12878.png")
+```
+
+
+```{r}
+# MDS: (4) By SV length
+MDS.xy %>% mutate(SV_length = log1p(SV_length)) %>%
+
+ggplot(aes(MDS1, MDS2, colour = SV_length)) + geom_point(size = 1) +
+  
+  scale_colour_viridis(option = "A") +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by SV length from NA12878, n=600")
+
+#ggsave2("MDS_ExAC_Z_by_SV_length_NA12878.png")
+```
+
+
+```{r}
+# MDS: (5) By Gene topology
+ggplot(MDS.xy, aes(MDS1, MDS2)) + geom_point(color = Topology, size = 1) +
+  
+  scale_colour_viridis(option = "B") +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores as measure of functional constraint \n grouped by gene topology from NA12878, n=600")
+
+#ggsave2("MDS_ExAC_Z_by_topology_NA12878.png")
 ```
 
 [END MDS]
