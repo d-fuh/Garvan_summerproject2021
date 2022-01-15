@@ -357,7 +357,6 @@ boxplot(data = large.full, SV_length ~ Caller)
 boxplot(log10(abs(large.full$SV_length)) ~ large.full$Caller)
 ```
 
-> Q: Looks like we have some 0-sized SVs being called...how?
 
 ```{r}
 # a nicer-looking alternative to the above plot
@@ -375,11 +374,12 @@ cowplot::ggsave2("SV_size_by_callers_NA12878_box.png")
 First look: 
 
 
-- Delly has best QC (few outliers in comparison --- or were they filtered out?)
-- Manta has large outlier group (very large-sized SV calls)
-- Melt has high precision --- in comparison to other callers
+- Delly has fewer outliers --- or were they filtered out during data prep stage?
+- Manta has large outlier group (very large-sized SV calls) but otherwise more precise than the other two (?)
+- Melt calls specifically ALU/SVs of size < 1kb
 - Wham has considerable variance and overall similar call-range (in size) to Manta
-- SvABA is excluded due to its SNV-focused nature (?)
+- SvABA is excluded as it's poorly annotated. Note that SV size = 1 for all svaba.sv.vcf calls. (WHY?)
+
 
 
 ```{r}
@@ -420,7 +420,7 @@ boxplot(log10(abs(sizedSVs$SV_length)) ~ sizedSVs$Caller)
 
 sizedSVs %>% filter(Caller == "Melt") %>%
   ggplot(aes(x=SV_length)) + geom_histogram(binwidth = 25) + 
-  ggtitle("SV called by Melt, whose size is < 20 kb in NA12878") +
+  ggtitle("Length of SV called by Melt (limit size < 20 kb) in NA12878") +
   facet_zoom(xlim = c(0, 500)) ## zoom in on ~ 500 bp region
 
 ggsave2("SV_size_under_20kb_Melt_NA12878_zoom.png")
@@ -459,6 +459,9 @@ ggsave2("SV_size_count_by_caller_20kb_NA12878.png")
 
 Seems like when putting SvABA aside, Melt has very high precision in calling smaller SVs --- especially those of size ~280 bp.
 
+> Obviously --- Melt was designed to call variants like ALU (from e.g. AluY) and other transposible elements like LINE, which typically span around < 1 kb.
+
+
 On the other hand, Delly, Manta, and Wham seems to call much larger variants (even when prefiltered to size < 20 kb). So far it's consistent with our previous analysis:
 
 
@@ -484,18 +487,41 @@ ggplot(noNAlengthSV,
        aes(SV_chrom, SV_length, color=Caller)) + geom_point() + ylab("SV size")
 ```
 
+```{r message=FALSE}
+# log version
+noNAlengthSV %>% mutate(SV_length = abs(SV_length)) %>%
+  
+  ggplot(.) + aes(SV_chrom, SV_length, color=Caller) + geom_point() +
+  
+  # try to apply convex hulls here...or similar models
+  
+  scale_y_log10(breaks=c(10, 10^2, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8), 
+                labels=c("10 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  
+  xlab("Chromosome") + ylab("SV size") + theme_few()
+
+ggsave2("SV_size_by_caller_across_chromosomes.png")
+```
+
 
 ```{r message=FALSE}
-## log
-noNAlengthSV %>% mutate(SV_length = abs(SV_length)) %>% 
+## try to sample down a bit to avoid overpopulation confounding
+# (n_Wham = 5482, n_Manta = 5391, n_Delly = 3165, n_Melt = 1003)
+
+noNAlengthSV %>% mutate(SV_length = abs(SV_length)) %>% .[sample(nrow(.), 6000), ] %>%
   
   ggplot() + aes(SV_chrom, SV_length, color=Caller) + geom_point() +
   
   # try to apply convex hulls here...or similar models
   
-  scale_y_log10() + ylab("SV size") + xlab("Chromosome") + theme_few()
+  scale_y_log10(breaks=c(10, 10^2, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8), 
+                labels=c("10 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  
+  xlab("Chromosome") + ylab("SV size") + theme_few() +
+  
+  ggtitle("sampled at n=6000 out of 15041 calls")
 
-ggsave2("SV_size_by_caller_across_chromosomes.png")
+ggsave2("SV_size_by_caller_across_chromosomes_subsampled.png")
 ```
 
 
@@ -516,7 +542,7 @@ ggplot(sizedSVs) + aes(SV_chrom, SV_length, color=Caller) +
   
   geom_point(color = ifelse(abs(sizedSVs$SV_length) < 10000, "grey50", "red")) + 
   
-  ylab("SV length (20kb)") + xlab("Chromosome") +
+  ylab("SV length (< 20kb)") + xlab("Chromosome") +
   
   facet_wrap( ~Caller, nrow = 1) + theme_bw() + #theme(axis.text.x = element_text(angle = 60, vjust = 1, hjust = 1.2)) +
   
