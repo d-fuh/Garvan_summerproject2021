@@ -8,6 +8,9 @@
 *.tsv.gz
 *.DS_Store
 
+# Citations
+Citation/*.*
+
 # NA12878 main folder
 NA12878_benchmark/AnnotSV_vis_*.html
 NA12878_benchmark/*.nb.html

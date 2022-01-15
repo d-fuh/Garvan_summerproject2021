@@ -847,6 +847,13 @@ Since they are Z scores ... they should approximately follow known distribution 
 
 --> Extract all ExAC data into numeric mtx
 ```{r}
+# selecting a subset of SV size < 20 kb 
+# as we are evaluating whether ExAC Z scores together are a good representation/estimate of 
+# "functional constraint" corresponding to a gene-variant pair. We are hence omitting larger variants
+# that likely span multiple genes.
+
+# Also, vegan::metaMDS doesn't seem tolerate huge data frames well.
+
 large.full %>%
   filter(between(SV_length, -20000, 20000)) %>%
   subset(select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ")) -> Z.mtx
@@ -862,7 +869,7 @@ Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes all rows containing any NA
 
 #select(Z.mtx, -ExAC_misZ) -> Z.mtx
 
-#Z.mtx <- decostand(Z.mtx, method= "max") ## TODO: proper std option? omittable?
+#Z.mtx <- decostand(Z.mtx, method= "max") ## TODO: omittable? Z score already a standardised measure.
 
 round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ
 ```
@@ -907,7 +914,7 @@ MDS.xy$ACMG_class = large.full[match(row.names(MDS.xy), row.names(large.full)),"
 
 MDS.xy$SV_type = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_type"]
 
-#MDS.xy$SV_length = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_length"]
+MDS.xy$SV_length = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_length"]
 
 MDS.xy$SV_chrom = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_chrom"]
 ```
@@ -933,10 +940,13 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
   
   guides(color = guide_legend(override.aes = list(size = 4.5))) +
   
-  ggtitle("NMDS plot of five ExAC Z scores grouped by variant caller from NA12878 (n=600)")
+  ggtitle("NMDS plot of five ExAC Z scores of variants grouped by variant caller in NA12878 \n (n=600)")
 
 ggsave2("MDS_ExAC_Z_by_caller_NA12878.png")
 ```
+
+No apparent clustering pattern (by Caller; n = 600).
+
 
 #### 7-2. ExACZ ~ ACMG class
 ```{r}
@@ -959,7 +969,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() 
   
   guides(color = guide_legend(override.aes = list(size = 4.5))) +
   
-  ggtitle("NMDS plot of five ExAC Z scores grouped by ACMG class from NA12878 (n=600)")
+  ggtitle("NMDS plot of five ExAC Z scores grouped by ACMG class of variants in NA12878 \n (n=600)")
 
 ggsave2("MDS_ExAC_Z_by_ACMG_class_discrete_NA12878.png")
 ```
@@ -980,14 +990,20 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
   
   guides(color = guide_legend(override.aes = list(size = 4.5))) +
   
-  ggtitle("NMDS plot of five ExAC Z scores grouped by SV type from NA12878 (n=600)")
+  ggtitle("NMDS plot of five ExAC Z scores grouped by type of SV from NA12878 (n=600)")
 
 ggsave2("MDS_ExAC_Z_by_SV_type_NA12878.png")
 ```
 
 ```{r}
+table(as.factor(MDS.xy$SV_type))
+```
+
+
+```{r warning=FALSE}
 # Try facet_wrap
-ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
+MDS.xy %>% filter(SV_type != "SVA") %>%
+  ggplot(.) + aes(MDS1, MDS2, color = SV_type) + geom_point(size = 1) +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
@@ -1001,21 +1017,21 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
   
   facet_wrap( ~SV_type)
   
-  ggtitle("NMDS plot of five ExAC Z scores grouped by SV type from NA12878 (n=600)")
+  ggtitle("NMDS plot of five ExAC Z scores grouped by type of structural \n variants in NA12878 (n=600)")
 
 ggsave2("MDS_ExAC_Z_by_SV_type_NA12878_wrapped.png")
 ```
 
 
 
-#### [DITCHED] 7-4. ExACZ ~ SV length
+#### 7-4. ExACZ ~ SV length
 ```{r}
 # MDS: (4) By SV length
-MDS.xy %>% filter(!is.na(SV_length)) %>% mutate(SV_length = log1p(SV_length)) %>%
+MDS.xy %>% filter(!is.na(SV_length)) %>% mutate(SV_length = log10(abs(SV_length))) %>%
 
-ggplot(aes(MDS1, MDS2, colour = SV_length)) + geom_point(size = 1) +
+ggplot(aes(MDS1, MDS2, color = SV_length)) + geom_point(size = 1) +
   
-  scale_colour_viridis(option = "A") +
+  scale_color_viridis(option = "A") +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
@@ -1027,10 +1043,11 @@ ggplot(aes(MDS1, MDS2, colour = SV_length)) + geom_point(size = 1) +
   
   guides(color = guide_legend(override.aes = list(size = 4.5))) +
   
-  ggtitle("NMDS plot of five ExAC Z scores grouped by SV length from NA12878, n=600")
+  ggtitle("NMDS plot of five ExAC Z scores grouped by SV length in NA12878, n=600")
 
-#ggsave2("MDS_ExAC_Z_by_SV_length_NA12878.png")
+ggsave2("MDS_ExAC_Z_by_SV_length_NA12878.png")
 ```
+
 
 #### 7-5. ExACZ ~ variant location
 ```{r}
@@ -1125,6 +1142,11 @@ ggplot(Z.pca.sample) + aes(Comp.1, Comp.2, color=ACMG_class) + geom_point() +
 ```
 
 
+```{r}
+Z.pca.sample %>% filter(SV_type != "SVA") %>%
+  ggplot(.) + aes(Comp.1, Comp.2, color=SV_type) + geom_point() +
+   theme_bw() + facet_wrap( ~SV_type)
+```
 
 
 
