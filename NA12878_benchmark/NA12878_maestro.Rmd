@@ -46,8 +46,11 @@ rm(benchmark.annot)
 
 # Filtering and processing notes:
 
-    1) FILTER == "PASS"
-    2) (Section 6 onwards using maestro.small) -20,000 <= SV_length <= 20,000 (bp)
+    1) FILTER == "PASS" (Pre-filtered in maestro scripts)
+    2) SV_length != 0 (Filtered here)
+    
+There was an experiment in the SV length section where we restricted -20,000 <= SV_length <= 20,000 (bp).
+It was called "sizedSVs".
 
 
 # Working notes
@@ -72,6 +75,8 @@ Highlight "> Q" in the document to look for unanswered questions.
     1. Does massively-sized SV calls confound any of our results here? Why or why not?
     
     2. Why were there calls made on the Y chromosome, when NA12878 is known to be female?
+    
+    > Note that Manta didn't call any variants on Y --- it's other callers that have annotated calls on Y. Good to note!
 
 
 
@@ -79,6 +84,19 @@ Highlight "> Q" in the document to look for unanswered questions.
 # Introduction
 
 See ReadME.md.
+
+## Heterogeneity between caller outputs
+
+It is important to note that the VCF outputs produced not only different results, but different variables among the five callers.
+
+I am not sure about the VCF files yet (did not have time to go through them raw), but for the annotated TSVs I'm working with, I've noticed: 
+
+    1. the SvABA annotated output contains fully completed QUAL, but for Delly QUAL is mostly NA;
+    2. the SvABA (I think we used svaba.sv.vcf for sure...double check) output has SV_length = 1 for all calls (!!!)
+    3. the SvABA VCF has undergone import processing (see Svaba_output_processing.R)
+    4. the Melt calls were much smaller (-500 ~ 6,500 bp) than Delly, Manta, Wham (mean SV_length ~ 3mb)
+
+
 
 
 
@@ -105,6 +123,7 @@ You should only see one level in the two data frames tested --- "PASS".
 
 ```{r message=FALSE}
 library(tidyverse)
+library(ggforce)
 library(cowplot)
 library(vegan)
 library(viridis)
@@ -122,12 +141,6 @@ library(wesanderson) ## optional
 
 
 In this case, all of our callers benchmarked reported each call with PASS/lowQUAL/...other measures, as described previously, we filtered those only reported with the "PASS" status.
-
-```{r}
-hist(as.numeric(large.full$QUAL))
-```
-
-
 
 The read count / coverage factors are therefore considered uniform in the following analyses.
 
@@ -234,6 +247,16 @@ ggsave2("SV_type_by_caller_NA12878_full.png")
 rm("sample_size")
 ```
 
+Note that SvABA only counts BNDs in the entire call set, and has only SV_length = 1 (Even if we used strictly svaba.sv.vcf!)
+
+```{r warning=FALSE}
+# SV type
+ggplot(svaba.tst) + aes(SV_type) + geom_histogram(stat = "count")
+# SV length
+SV_length.svaba <- svaba.tst$SV_end - svaba.tst$SV_start
+plot(SV_length.svaba)
+```
+
 
 #### 2-2. [OPTIONAL] Synthesising SV types to four simple SV events: {DEL, DUP, INS, INV}
 
@@ -275,7 +298,7 @@ ggsave2("SV_type_by_caller_and_coverage_NA12878.png")
 
 
 
-### 3. Number of variants detected by all methods
+### 4. Number of variants detected by all methods
 
 ```{r eval=FALSE}
 table(as.factor(large.full$Caller))
@@ -310,7 +333,7 @@ We want to know: Are any of these calls made by multiple callers? We take the fo
 
 
 
-### 4. ACMG class of variants
+### 5. ACMG class of variants
 
 ```{r}
 # first, see the distribution of ACMG class in annotated data
@@ -393,7 +416,7 @@ ggsave2("ACMG_class_and_SV_type_by_caller_NA12878_split_exc_NA.png")
 
 
 
-### 5. Detected variants affecting CDS
+### 6. Detected variants affecting CDS
 
 ```{r}
 table(large.full$Location2)
@@ -401,7 +424,7 @@ table(large.full$Location2)
 This task requires AM == "Split".
 
 
-#### 5-1. CDS-affecting SVs
+#### 6-1. CDS-affecting SVs
 
 ```{r}
 table(large.split$Location2)
@@ -465,7 +488,7 @@ ggsave2("CDS_affecting_SV_type_and_topology_NA12878_wrapped.png")
 
 
 
-#### 5-2. [ONGOING] The elite list
+#### 6-2. [ONGOING] The elite list
 
 <1st layer: AnnotSV input>
 
@@ -507,27 +530,30 @@ large.split %>% filter(ACMG_class %in% c("full=4", "full=5")) %>% ## select path
 
 
 
-### 6. SV length by caller
+### 3. SV length by caller
 
-#### 6-1. SV length by caller, no restriction
+#### 3-1. SV length by caller, no restriction
 ```{r}
 boxplot(data = large.full, SV_length ~ Caller)
 ```
 
 
 ```{r}
-boxplot(log1p(large.full$SV_length) ~ large.full$Caller)
+boxplot(log10(abs(large.full$SV_length)) ~ large.full$Caller)
 ```
+
+> Q: Looks like we have some 0-sized SVs being called...how?
 
 ```{r}
 # a nicer-looking alternative to the above plot
 large.full %>% filter(!is.na(SV_length)) %>%
   filter(SV_length != 0) %>%
-  
+  mutate(SV_length = abs(SV_length)) %>%
   ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + geom_boxplot() + 
-  theme_bw() + scale_y_log10()
+  theme_bw() + scale_y_log10() +
+  ylab("SV size")
 
-ggsave2("SV_length_by_callers_NA12878_box.png")
+cowplot::ggsave2("SV_size_by_callers_NA12878_box.png")
 ```
 
 First look: 
@@ -540,62 +566,94 @@ First look:
 - SvABA is excluded due to its SNV-focused nature (?)
 
 
+```{r}
+# interested in knowing the SV length distribution excluding SvABA (only BND, length=1) and Melt (small SV, mean=~280 bp)
+filter(large.full, !is.na(SV_length)) %>% ## report these later
+  filter(SV_length != 0) %>% ## why do these even exist as calls? lol
+  mutate(SV_length = abs(SV_length)) %>% ## BE CAREFUL: log takes only X > 0 !! We are hence ignoring deletions here
+  filter(., Caller %in% c("Delly", "Manta", "Wham")) %>%
+  ggplot(.) + aes(SV_length, fill=Caller) + geom_density() + scale_x_log10() + theme_minimal() +
+  xlab("SV size")
+
+cowplot::ggsave2("Dentsity_SV_size_callers_exc_Melt_SvABA_NA12878.png")
+```
+
+
 Now, we look at whether to limit our SV call set by size or not:
 
 
 #### Limiting SV call size
 ```{r}
-# need to clean NA/0 entries first
+# clean NA/0 entries first
 large.full %>% filter(!is.na(SV_length)) %>%
   filter(SV_length != 0) -> noNAlengthSV
 
-# need to limit SV length range
-sizedSVs <- noNAlengthSV %>% filter(between(SV_length, -20000, 20000))
+# limit SV length range
+sizedSVs <- noNAlengthSV %>% filter(between(SV_length, -20000, 20000)) # next try +-100k
 
 # check distribution again
 boxplot(data = sizedSVs, SV_length ~ Caller)
 
 # apply transform
-boxplot(log1p(sizedSVs$SV_length) ~ sizedSVs$Caller)
+boxplot(log10(abs(sizedSVs$SV_length)) ~ sizedSVs$Caller)
 
 # suspect Melt calls a lot of small SVs (ALU, LINE1, SVA) --- cf. Chunk/Figure 2-1
+#view(filter(sizedSVs, Caller == "Melt")$SV_length) ## better view than table here
+
 sizedSVs %>% filter(Caller == "Melt") %>%
-  ggplot(aes(x=SV_length)) + geom_histogram() + ggtitle("Of those of |size| < 20 kb, SV length called by Melt in NA12878");
+  ggplot(aes(x=SV_length)) + geom_histogram(binwidth = 25) + 
+  ggtitle("Of those of |size| < 20 kb, SV length called by Melt in NA12878") +
+  facet_zoom(xlim = c(0, 500)) ## zoom in on ~ 500 bp region
 
-table(filter(sizedSVs, Caller == "Melt")$SV_length)
-
-# in fact, those called by Melt of size < 20kb are mostly in (mean) size 280 bp! --- not *that* small
+ggsave2("SV_size_under_20kb_Melt_NA12878_zoom.png")
+# in fact, those called by Melt of size < 20kb are mostly in (mean) size 280 bp!
 ```
 
-Seems like when putting SvABA aside, Melt has very high precision in calling smaller SVs --- still of considerable mean size ~ 280 bp.
+Seems like when putting SvABA aside, Melt has very high precision in calling smaller SVs --- especially those of size ~280 bp.
 
 On the other hand, Delly, Manta, and Wham seems to call much larger variants (even when prefiltered to size < 20 kb). So far it's consistent with our previous analysis:
 
 
-#### 6-2. SV length by caller, under 20 kb
+#### 3-2. SV length by caller, under 20 kb
 
 ```{r}
 # using sized SV set
 sizedSVs %>%
   
-  ggplot(aes(x=Caller, y=log10(0.5*(SV_length+mean(SV_length))), fill=Caller)) + geom_boxplot() + 
-  theme_bw()
+  ggplot(aes(x=Caller, y=abs(SV_length), fill=Caller)) + geom_boxplot() + scale_y_log10() +
+  theme_bw() + ylab("SV size") + xlab("")
 
-ggsave2("SV_length_by_callers_NA12878_box_sized.png")
+ggsave2("SV_size_under_20kb_by_callers_NA12878.png")
 ```
 
 
 
 Let's dig further:
 
-#### 6-3. SV length by caller, under 20 kb, across chromosomes
+#### 3-3. SV length by caller, under 20 kb, across chromosomes
 ```{r}
-# Q: How does SV length vary across Callers?
-
 ## original (unlimited) call set
-ggplot(noNAlengthSV, 
-       aes(SV_chrom, SV_length, color=Caller)) + geom_point()
+p1 <- ggplot(noNAlengthSV, 
+       aes(SV_chrom, SV_length, color=Caller)) + geom_point() + ylab("SV size")
+## log
+p2 <- noNAlengthSV %>% mutate(SV_length = abs(SV_length)) %>% 
+  
+  ggplot() + aes(SV_chrom, SV_length, color=Caller) + geom_point() +
+  scale_y_log10() + ylab("SV size") + theme_cowplot()
 
+p1
+p2
+ggsave2(p2, "SV_size_by_caller_across_chromosomes.png")
+```
+
+
+```{r}
+ggarrange(p1, p2, nrow=2)
+rm(p1, p2)
+```
+
+
+```{r}
 ## sized SVs
 ggplot(sizedSVs, 
        aes(SV_chrom, SV_length, color=Caller)) + geom_point() + ylab("SV length (limited to < 20kb)") + xlab("chromosome")
@@ -611,7 +669,7 @@ ggplot(sizedSVs,
 ggsave2("SV_length_under_20kb_by_caller_across_chromosomes_NA12878_wrapped.png")
 ```
 
-#### 6-4. ANOVA: SV length by caller, under 20 kb
+#### 3-4. ANOVA: SV length by caller, under 20 kb
 ```{r}
 aov(data=sizedSVs, SV_length ~ Caller) %>%
   summary()
