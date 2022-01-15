@@ -108,6 +108,7 @@ benchmark.split <- read.csv("Maestro_scripts/maestro.split.csv")
 
 ## Data subsetting & processing
 
+### 1. FILTER == "PASS"
 Make sure QC passed before running the rest of the analysis:
 ```{r}
 # always double-check
@@ -117,6 +118,18 @@ table(as.factor(benchmark.split$FILTER))
 
 You should only see one level in the two data frames tested --- "PASS".
 
+
+
+### 2. Reordering chromosome labels
+```{r}
+# Reordering SV_chrom axis
+benchmark.full$SV_chrom <- factor(benchmark.full$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
+
+benchmark.split$SV_chrom <- factor(benchmark.split$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
+```
+
+
+### 3. Coverage is to be aware of
 
 > NB: Both benchmark.full and benchmark.split contain overlayed information from the small, medium, and large set. As a result, it creates spikes that are artefacts which confounds the results if not removed. We will "filter the real data" back to a clean data frame in which only those calls from the "Large" NA12878 set is used.
 
@@ -132,18 +145,34 @@ large.split <- filter(benchmark.split, Coverage == "Large")
 ```
 
 
+
+### 4. SV length: SvABA has BND calls only and has, for some reason, size=0 (even though it should be 1)
+
 We further clean up the data frame:
 ```{r}
+# AM = full
 dim(large.full)
 # There shouldn't be any SV calls of size 0
 large.full <- large.full %>% filter(SV_length != 0) 
 dim(large.full)
 ```
 
-
-> Shockingly --- over 10,000 entries had SV_length = 0. How could there be!?
+> Over 10,000 entries (over 40% of original calls) in AM=full had SV_length = 0. These were the SvABA calls
 
 Note that we kept the calls with SV_length = NA, as some calls may still be valid even with missing SV_length.
+
+```{r}
+# AM = split
+dim(large.split)
+# There shouldn't be any SV calls of size 0
+large.split <- large.split %>% filter(SV_length != 0) 
+dim(large.split)
+```
+
+Guess what...these removed files contain no information on SvABA.
+
+So for analyses requiring SvABA to be included, we will run them on a separate notebook.
+
 
 
 
@@ -179,10 +208,6 @@ NB: "Coverage" was assigned as a new categorical variable to represent "from whi
 
 ### 1. SV call location across NA12878 by different callers
 
-```{r}
-# Reordering SV_chrom axis
-benchmark.full$SV_chrom <- factor(benchmark.full$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
-```
 
 > Q: Explain recordings in the Y chromosome.
 
@@ -510,12 +535,17 @@ plot(aov(data=sizedSVs, SV_length ~ Caller))
 
 
 ```{r}
-mutate(sizedSVs, SV_length_proper = log10(0.5*(SV_length+mean(SV_length)))) -> sizedSVs
+# log transform to accomodate the large SV size span
 
-aov(data=sizedSVs, SV_length_proper ~ Caller) %>%
-  summary()
+# ANOVA
+sizedSVs %>% mutate(SV_length = log10(abs(SV_length))) %>%
+  
+  aov(data=., SV_length ~ Caller) -> SV.size.aov
 
-plot(aov(data=sizedSVs, SV_length_proper ~ Caller))
+summary(SV.size.aov)
+
+# Check Q-Q plots
+plot(SV.size.aov)
 ```
 
 
@@ -526,7 +556,7 @@ plot(aov(data=sizedSVs, SV_length_proper ~ Caller))
 ### 4. Number of variants detected by all methods
 
 ```{r eval=FALSE}
-table(as.factor(large.full$Caller))
+table(as.factor(large.full$Caller)) ## SV size = NA included, size = 0 excluded
 ```
 
 We want to know: Are any of these calls made by multiple callers? We take the following approach.
@@ -582,25 +612,25 @@ ggplot(aes(x = ACMG.class, fill=SV_type)) +
     geom_bar() +
     theme_bw() +
     labs(x="ACMG class", y="Count") +
-    ggtitle("ACMG class and SV type detected by various callers from NA12878, AM=full")
+    ggtitle("ACMG class and SV type detected in NA12878, AM=full")
 
-ggsave2("ACMG_class_and_SV_type_by_caller_NA12878_full.png")
+ggsave2("ACMG_class_and_SV_type_NA12878_AM_full.png")
 
 rm("sample_size")
 ```
 
-Try removing the NA rows:
+Try removing ACMG = NA entries:
 
 ```{r message=FALSE}
-filter(large.full, ACMG_class != "full=NA") %>%
+filter(large.full, !is.na(ACMG_class)) %>%
 
 ggplot(aes(x = ACMG_class, fill=SV_type)) +
     geom_bar() +
     theme_bw() +
     labs(x="ACMG class", y="count") +
-    ggtitle("ACMG class and SV type by callers from NA12878, excluding NA. AM=full")
+    ggtitle("ACMG class and SV type in NA12878, excluding NA. AM=full")
 
-ggsave2("ACMG_class_by_SV_type_and_caller_NA12878_full_exc_NA.png")
+ggsave2("ACMG_class_and_SV_type_NA12878_AM_full_exc_NA.png")
 ```
 
 
@@ -617,16 +647,36 @@ ggplot(aes(x = ACMG.class, fill=SV_type)) +
     geom_bar() +
     theme_bw() +
     labs(x="ACMG class", y="count") +
-    ggtitle("ACMG class and SV type detected by various callers in NA12878, AM=split")
+    ggtitle("ACMG class and SV type in NA12878, AM=split")
 
-ggsave2("ACMG_class_and_SV_type_by_caller_NA12878_split.png")
+ggsave2("ACMG_class_and_SV_type_NA12878_AM_split.png")
 
 rm("sample_size")
 ```
 
-We see that full=NA entries were mostly INV called by SvABA.
+We see that full=NA entries were almost exclusively the INV calls. Who made them?
+```{r}
+large.split %>%
+  filter(SV_type == "INV") %>%
+  ggplot(., aes(x = ACMG_class, fill=Caller)) + geom_bar() +
+  labs(x="ACMG class", y="count") +
+  ggtitle("Let's see who made those NA class INV calls...?")
+```
 
-We proceed to filter them out and rerun to find anything interesting:
+```{r}
+# similarly
+large.split %>%
+  filter(ACMG_class == "full=NA") %>%
+  ggplot(., aes(x = SV_type, fill=Caller)) + geom_bar() + scale_y_log10() +
+  labs(x="SV types having NA class", y="count") +
+  ggtitle("Are they all INV? Made by whom, also?")
+```
+
+
+Note that **it seems like only SV_type == c("DEL", "DUP") are annotated with ACMG classes.** Biased much?
+
+
+We proceed to filter the NA class out and rerun:
 ```{r message=FALSE}
 filter(large.split, ACMG_class != "full=NA") %>%
 
@@ -634,9 +684,9 @@ ggplot(aes(x = ACMG_class, fill=SV_type)) +
     geom_bar() +
     theme_bw() +
     labs(x="ACMG class", y="count") +
-    ggtitle("ACMG class and SV type by callers from NA12878, excluding NA. AM=split")
+    ggtitle("ACMG class and SV type in NA12878, excluding NA. AM=split")
 
-ggsave2("ACMG_class_and_SV_type_by_caller_NA12878_split_exc_NA.png")
+ggsave2("ACMG_class_and_SV_type_NA12878_split_exc_NA.png")
 ```
 
 
@@ -662,12 +712,12 @@ filter(large.split, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'U
     geom_bar() +
     theme_bw() +
     labs(x="Gene topology", y="Count") +
-    ggtitle("CDS-affecting SV type and variant topology from NA12878, AM=split")
+    ggtitle("CDS-affecting SV type and variant topology in NA12878, AM=split")
 ```
 
 For a clearer plot:
 ```{r}
-# subset of split data frame containing CDS-affecting entries --- AnnotSV-called
+# subset of AM=split data frame containing CDS-affecting entries --- AnnotSV-called
 CDS.set <- filter(large.split, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR"))
 ```
 
@@ -684,7 +734,7 @@ ggplot(aes(x = topos, fill=SV_type)) +
     geom_bar() + scale_y_sqrt() +
     theme_bw() +
     labs(x="Gene topology", y="Count") +
-    ggtitle("CDS-affecting SV type and variant topology from NA12878, AM=split")
+    ggtitle("CDS-affecting SV type and variant topology in NA12878, AM=split")
 
 ggsave2("CDS_affecting_SV_type_and_topology_NA12878.png")
 
@@ -693,22 +743,36 @@ rm("sample_size")
 
 > Q: Why is the count (y)-axis inaccurate?
 
+We scaled the count (Y) axis by sqrt(). Read on what biases it introduced.
+
 
 
 
 ```{r}
 # try facet_wrap
-filter(large.split, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>%
-  ggplot() + aes(x = SV_type, fill=SV_type) + scale_y_sqrt() +
+CDS.set %>%
+  ggplot(.) + aes(x = SV_type, fill=SV_type) + scale_y_sqrt() +
     geom_bar() + 
     facet_wrap( ~Location2) +
     theme_bw() +
     labs(x="Gene topology", y="Count") +
-    ggtitle("CDS-affecting SV type and variant topology from NA12878, AM=split")
+    ggtitle("CDS-affecting SV type and variant topology in NA12878, AM=split")
 
 ggsave2("CDS_affecting_SV_type_and_topology_NA12878_wrapped.png")
 ```
 
+
+To have a closer look on the variants affecting specifically only the CDS region, we subset:
+```{r}
+CDS.set %>% filter(Location2 == "CDS") %>%
+  ggplot(.) + aes(x = SV_type, fill=SV_type) +
+    geom_bar() + 
+    theme_bw() +
+    labs(x="SV type", y="Count") +
+    ggtitle("CDS-affecting (exclusive) SV type in NA12878, AM=split")
+
+ggsave2("CDS_affecting_exclusive_SV_type_NA12878.png")
+```
 
 
 
@@ -742,10 +806,14 @@ table(as.factor(large.split$ACMG_class))
 
 
 ```{r}
+## TEST WORKFLOW TO BE COMPLETED
+##
 large.split %>% filter(ACMG_class %in% c("full=4", "full=5")) %>% ## select pathogenic variants 
   filter(Caller_count >= 3) %>% ## TODO new variable we will introduce at section 3
   filter(Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>% ## CDS-affecting
   filter(Tissue == "which") -> elite.variants.which ## TODO new variable to introduce at the end of (last) section 5-1
+
+write.csv(elite.variants.which, "elite_var_affecting_which.csv")
 ```
 
 
