@@ -3,6 +3,7 @@
 *.docx
 *.rdata
 *.rhistory
+*.nb.html
 *.vcf.gz
 *.vcf
 *.tsv.gz
