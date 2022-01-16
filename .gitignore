@@ -13,7 +13,7 @@ Citation/*.*
 
 # NA12878 main folder
 NA12878_benchmark/AnnotSV_vis_*.html
-NA12878_benchmark/*.nb.html
+NA12878_benchmark/**/*.nb.html
 
 # AnnotSV visualisation files
 NA12878_benchmark/AnnotVis/*.*
