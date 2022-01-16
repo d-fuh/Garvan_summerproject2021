@@ -1,0 +1,51 @@
+---
+title: "Confirming maestro plyr::join (full) was correct"
+output: html_notebook
+---
+Just trying to see if I actually joined the master data frames correctly in the maestro script...
+
+```{r}
+# create test data frames
+df1 <- data.frame(colA = 0:9, colB = sin(0:9 / 10), colC = c("A", "B", NA, NA, "E", "F", "G", '.', "I", "J"), colNAME = "DF1")
+df2 <- data.frame(colA = 0:9, colB = cos(0:9 / 10), colC = c(NA, NA, NA, NA, "E", "F", "G", NA, NA, NA), colNAME = "DF2")
+df3 <- data.frame(colA = 1:10, colB = sin(0:9 / 10), colC = c("A", "B", NA, NA, "E", "F", "G", '.', "I", "J"), colNAME = "DF3")
+```
+
+In our maestro scripts, four/five VCF-converted-to-TSV files were read in. They were then all labelled with respective caller names, and the subset type of NA12878 they came from (S/M/L). 
+
+We then proceeded to join these data frames by columns (Thanks to AnnotSV, most variables are identical). We used the rare (?) plyr::join(type = "full") to "ensure" --- by that I mean I think it worked this way --- that all data frames were annealed together by column names, irrespective of NA entries (there were a lot!) or zeros, etc.
+
+We now test whether this holds true at all...
+
+```{r}
+library(plyr)
+
+df12 <- join(df1, df2, type = "full")
+
+#view(df12)
+```
+
+It seems like it does! Let's test further:
+
+```{r}
+df123 <- join(df12, df3, type = "full")
+
+#view(df123)
+```
+
+It really just stacks upon each other regardless of NA entries or unmatching entries (of course)! What only matters was mostly the column names.
+
+What happens when we have new / lack of columns comparing to others?
+```{r}
+# new data frame with new and lost columns
+df4 <- data.frame(colA = 1:10, colC = c("A", "B", NA, NA, ".", ".", ".", '.', "I", "J"), colD = "tester", colNAME = "DF4")
+
+df1234 <- join(df123, df4, type = "full")
+
+#view(df1234)
+```
+
+Absolutely marvelous! The new column introduced were joined smoothly, with old data frames (not containing this variable) showing simply NA in this column, and new data frame (df4) showing its own entires. Conversely, those columns lacking in the new data frame (colB in df4) were displayed as NA, nonetheless the old data frames (df1-3) still showing their respective entries in the new summative data frame.
+
+
+We therefore confirm that plyr::join(type = "full") is *the* approach we were looking for and used in our maestro script.

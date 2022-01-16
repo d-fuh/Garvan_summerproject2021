@@ -180,6 +180,7 @@ So for analyses requiring SvABA to be included, we will run them on a separate n
 
 ```{r message=FALSE}
 library(tidyverse)
+library(ggthemes)
 library(ggforce)
 library(cowplot)
 library(vegan)
@@ -206,7 +207,7 @@ NB: "Coverage" was assigned as a new categorical variable to represent "from whi
 
 
 
-### 1. SV call location across NA12878 by different callers
+### 1. SV call location across NA12878
 
 
 > Q: Explain recordings in the Y chromosome.
@@ -273,9 +274,11 @@ ggsave2(filename = "SV_location_by_caller_NA12878_full.png")
 
 
 
-### 2. SV type by caller 
+### 2. Types of Structural Variants
 
-#### 2-1. Including special classes {ALU, BND, LINE1, SVA} from Melt, Manta and SvABA
+#### 2-1. SV tpye between callers (excluding SvABA due to NA length*)
+
+*We know all SvABA read-in's contain SV size = 1, type == "BND" for all calls.
 
 ```{r message=FALSE}
 sample_size = large.full %>% group_by(SV_type) %>% summarize(num=n())
@@ -295,7 +298,13 @@ ggsave2("SV_type_by_caller_NA12878_full.png")
 rm("sample_size")
 ```
 
-Note that SvABA only counts BNDs in the entire call set, and has only SV_length = 1 (Even if we used strictly svaba.sv.vcf!)
+Note that:
+
+    1. ALU, LINE1 (sometimes referred to as L1) and SVA (SINE-R, VNTR and Alu composite) are all considered MEIs (Mobile element *insersion*s), and in our call set were all produced by [Melt].
+    
+    2. [SvABA] only counts BNDs in the entire call set, and has only SV_length = 1 (Even if we used strictly svaba.sv.vcf!)
+
+
 
 ```{r eval=FALSE, warning=FALSE}
 # svaba.tst is from GR_script.R
@@ -307,7 +316,7 @@ plot(SV_length.svaba)
 ```
 
 
-#### 2-2. [OPTIONAL] Synthesising SV types to four simple SV events: {DEL, DUP, INS, INV}
+#### 2-2. [OPTIONAL] Synthesising SV types to four simple SV events: {DEL, DUP, INS/MEI, INV}
 
 
 
@@ -319,7 +328,7 @@ plot(SV_length.svaba)
 
 
 
-#### 2-3. Wrapping SV types with coverage level (Small, Medium, Large NA12878)
+#### 2-3. SV types vs coverage level (Small, Medium, Large subset reads of NA12878)
 
 ```{r message=FALSE}
 benchmark.full %>%
@@ -346,7 +355,7 @@ ggsave2("SV_type_by_caller_and_coverage_NA12878.png")
 
 
 
-### 3. SV length by caller
+### 3. Size and length of Structural Variants in the call set
 
 #### 3-1. SV length by caller, no restriction
 ```{r}
@@ -408,7 +417,10 @@ large.full %>% filter(!is.na(SV_length)) %>%
 
 # limit SV length range
 sizedSVs <- noNAlengthSV %>% filter(between(SV_length, -20000, 20000)) # next try +-100k
+```
 
+
+```{r message=FALSE}
 # check distribution again
 boxplot(data = sizedSVs, SV_length ~ Caller)
 
@@ -462,6 +474,7 @@ Seems like when putting SvABA aside, Melt has very high precision in calling sma
 > Obviously --- Melt was designed to call variants like ALU (from e.g. AluY) and other transposible elements like LINE, which typically span around < 1 kb.
 
 
+
 On the other hand, Delly, Manta, and Wham seems to call much larger variants (even when prefiltered to size < 20 kb). So far it's consistent with our previous analysis:
 
 
@@ -480,7 +493,7 @@ ggsave2("SV_size_under_20kb_by_callers_NA12878.png")
 
 Let's dig further:
 
-#### 3-3. SV length by caller, under 20 kb, across chromosomes
+#### 3-3. SV length across chromosomes, marked by Caller
 ```{r message=FALSE}
 ## original (unlimited) call set
 ggplot(noNAlengthSV, 
@@ -551,7 +564,7 @@ ggplot(sizedSVs) + aes(SV_chrom, SV_length, color=Caller) +
 ggsave2("SV_length_under_20kb_by_caller_across_chromosomes_NA12878_wrapped.png")
 ```
 
-#### 3-4. ANOVA: SV length by caller, under 20 kb
+#### 3-4. ANOVA: SV length by caller
 ```{r}
 aov(data=sizedSVs, SV_length ~ Caller) %>%
   summary()
@@ -575,7 +588,42 @@ plot(SV.size.aov)
 ```
 
 
+#### 3-5. SV length vs SV type 
 
+
+```{r warning=FALSE, message=FALSE}
+# want to create a walking line graph of each SV type, X = SV length, Y = count (log each axis)
+#large.full %>% group_by(SV_type) %>% summarize(num=n()) %>%
+
+ggplot(large.full) + aes(x=abs(SV_length), color = SV_type) + 
+  geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
+  theme_classic() + 
+  ylab("Count") +
+  scale_color_discrete(name = "SV type") +
+  scale_x_log10(name = "SV size", 
+                breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
+                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb"))
+
+ggsave2("SV_length_of_each_type_line_graph_NA12878.png")
+```
+
+We already know that SVA only has 35 counts and LINE1 has only 105 --- while ALU has > 800 counts and other types well over 1K counts.
+
+```{r warning=FALSE, message=FALSE}
+# if we're only interested in DEL/DUP/INV/INS/ALU**
+large.full %>% filter(!(SV_type %in% c("SVA", "LINE1"))) %>%
+
+ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
+  geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
+  scale_color_discrete(name = "SV type") +
+  theme_classic() + 
+  ylab("Count") +
+  scale_x_log10(name = "SV size (log-scaled)", 
+                breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
+                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb"))
+
+ggsave2("SV_length_of_each_type_exc_SVA_L1_NA12878.png")
+```
 
 
 
