@@ -187,6 +187,7 @@ library(vegan)
 library(egg)
 library(viridis)
 library(wesanderson) ## optional
+library(RColorBrewer)
 ```
 
 
@@ -372,11 +373,16 @@ boxplot(log10(abs(large.full$SV_length)) ~ large.full$Caller)
 large.full %>% filter(!is.na(SV_length)) %>%
   filter(SV_length != 0) %>%
   mutate(SV_length = abs(SV_length)) %>%
+  
   ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + geom_boxplot() + 
-  theme_bw() + scale_y_log10() +
-  ylab("SV size") + xlab("") + ggtitle("SV size by callers in NA12878, excluding SvABA (l=1)")
+  theme_bw() + 
+  scale_y_log10(breaks=c(10, 10^2, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8), 
+                labels=c("10 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  
+  ylab("SV size (log-scaled)") + xlab("") + 
+  ggtitle("SV size by callers in NA12878, excluding SvABA (l=1)")
 
-cowplot::ggsave2("SV_size_by_callers_NA12878_box.png")
+ggsave2("SV_size_by_callers_NA12878_box.png")
 ```
 
 
@@ -397,10 +403,15 @@ filter(large.full, !is.na(SV_length)) %>% ## report these later
   filter(SV_length != 0) %>% ## why do these even exist as calls? lol
   mutate(SV_length = abs(SV_length)) %>% ## BE CAREFUL: log takes only X > 0 !! 
   filter(., Caller %in% c("Delly", "Manta", "Wham")) %>%
-  ggplot(.) + aes(SV_length, fill=Caller) + geom_density() + scale_x_log10() + theme_classic() +
-  xlab("SV size")
+  
+  ggplot(.) + aes(SV_length, fill=Caller) + geom_density() +
+  #scale_fill_brewer(palette = "Set2") +
+  scale_x_log10(breaks=c(10, 10^2, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8), 
+                labels=c("10 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  theme_classic() +
+  xlab("SV size (log-scaled)") + ylab("Density")
 
-cowplot::ggsave2("Dentsity_SV_size_callers_exc_Melt_SvABA_NA12878.png")
+ggsave2("Dentsity_SV_size_callers_exc_Melt_SvABA_NA12878.png")
 ```
 
 
@@ -599,8 +610,8 @@ ggplot(large.full) + aes(x=abs(SV_length), color = SV_type) +
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
   theme_classic() + 
   ylab("Count") +
-  scale_color_discrete(name = "SV type") +
-  scale_x_log10(name = "SV size", 
+  scale_color_brewer(name = "SV type", palette = "Set2") +
+  scale_x_log10(name = "SV size (log-scaled)", 
                 breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
                 label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb"))
 
@@ -615,7 +626,7 @@ large.full %>% filter(!(SV_type %in% c("SVA", "LINE1"))) %>%
 
 ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
-  scale_color_discrete(name = "SV type") +
+  scale_color_brewer(name = "SV type", palette = "Set2") +
   theme_classic() + 
   ylab("Count") +
   scale_x_log10(name = "SV size (log-scaled)", 

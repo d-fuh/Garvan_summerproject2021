@@ -10,7 +10,7 @@
 *.DS_Store
 
 # Citations
-Citation/*.*
+Citations/*.*
 
 # NA12878 main folder
 NA12878_benchmark/AnnotSV_vis_*.html
