@@ -1,7 +1,7 @@
 # Read in svaba vcf file
 library(dplyr)
 
-svaba.sv.vcf="~/Downloads/NA12878.svaba.sv.vcf"
+svaba.sv.vcf="~/Documents/GitHub/summerproject2021/NA12878_benchmark/SvABA_processing/NA12878.svaba.vcf"
 
 cols <- colnames(read.table(pipe(paste0('grep -v "##" ', svaba.sv.vcf,' | grep "#"| sed s/#//')), header = TRUE))
 cols <- sapply(cols, function(x) gsub("(mrkdp\\.)|(\\.bam)", "", x))
