@@ -261,6 +261,20 @@ We see that the pink column is the true graph we wanted in Section 1-1. We will 
 #### 1-3. SV location by callers
 
 ```{r}
+# including SvABA
+benchmark.full %>% filter(Coverage == "Large") %>%
+
+ggplot(aes(x = SV_chrom, fill=Caller)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="Chromosome", y="count") + 
+    ggtitle("SV location by different callers in NA12878 using AnnotSV, AM=full")
+
+ggsave2(filename = "SV_location_by_caller_NA12878_full_svaba.png")
+```
+
+
+```{r}
 large.full %>%
 
 ggplot(aes(x = SV_chrom, fill=Caller)) +
@@ -291,10 +305,10 @@ large.full %>%
 ggplot(aes(x = svtype, fill=Caller)) +
     geom_bar() + #scale_y_log10() +
     theme_bw() +
-    labs(x="Type of SV", y="count") +
+    labs(x="Type of SV", y="Count") +
     ggtitle("Types of structural variants detected by different callers in NA12878")
 
-ggsave2("SV_type_by_caller_NA12878_full.png")
+ggsave2("SV_type_by_caller_NA12878_exc_svaba.png")
 
 rm("sample_size")
 ```
@@ -316,6 +330,25 @@ SV_length.svaba <- svaba.tst$SV_end - svaba.tst$SV_start
 plot(SV_length.svaba)
 ```
 
+```{r message=FALSE}
+# including SvABA
+sample_size = benchmark.full %>% filter(Coverage == "Large") %>% group_by(SV_type) %>% summarize(num=n())
+
+benchmark.full %>%
+  filter(Coverage == "Large") %>%
+  left_join(sample_size) %>%
+  mutate(svtype = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = svtype, fill=Caller)) +
+    geom_bar() + #scale_y_log10() +
+    theme_bw() +
+    labs(x="Type of SV", y="Count") +
+    ggtitle("Types of structural variants detected by different callers in NA12878")
+
+ggsave2("SV_type_by_caller_NA12878_full.png")
+
+rm("sample_size")
+```
 
 #### 2-2. [OPTIONAL] Synthesising SV types to four simple SV events: {DEL, DUP, INS/MEI, INV}
 
@@ -600,7 +633,6 @@ plot(SV.size.aov)
 
 
 #### 3-5. SV length vs SV type 
-
 
 ```{r warning=FALSE, message=FALSE}
 # want to create a walking line graph of each SV type, X = SV length, Y = count (log each axis)
