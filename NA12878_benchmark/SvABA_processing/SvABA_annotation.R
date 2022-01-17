@@ -29,4 +29,6 @@ get_sv_type <- function(x){
   }
   return(sv_type)
 }
-svaba_uniq$SVTYPE <- sapply(svaba_uniq$ID, get_sv_type)
+svaba_uniq$SV_type <- sapply(svaba_uniq$ID, get_sv_type)
+
+write.csv(svaba_uniq, "svaba.uniq.csv")
