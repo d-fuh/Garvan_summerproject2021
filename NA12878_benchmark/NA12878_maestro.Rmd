@@ -907,9 +907,17 @@ ggsave2("CDS_affecting_exclusive_SV_type_NA12878.png")
 ```
 
 
+#### 6-2. Gene counts, exon counts, and frameshift
+```{r}
+hist(log1p(large.full$Gene_count))
+```
 
 
-#### 6-2. [ONGOING] The elite list
+
+
+
+
+#### 6-3. [ONGOING] The elite list
 
 <1st layer: AnnotSV input>
 
