@@ -5,7 +5,6 @@
 *.rhistory
 *.nb.html
 *.vcf.gz
-*.vcf
 *.tsv.gz
 *.DS_Store
 
