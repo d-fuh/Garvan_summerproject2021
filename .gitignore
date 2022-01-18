@@ -1,6 +1,4 @@
 *.jar
-*.pdf
-*.docx
 *.rdata
 *.rhistory
 *.nb.html

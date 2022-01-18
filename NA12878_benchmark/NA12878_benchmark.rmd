@@ -1,0 +1,19 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is a continuation of the benchmarking process on SV callers of NA12878 data. 
+
+In this notebook, we benchmark the callers against a known variant call set, instead of each other (for that, see NA12878_maestro).
+
+
+# Section II. [w/ reference] Caller set {Delly, Manta, SvABA, Wham, Melt} against Gold Standard (NA12878 truth set)
+
+## 1. [ONGOING] Precision, Recall, and FPR
+
+### Definition of terms
+
+    - Precision = 1 - false discovery rate = 1 - FPR
+    
+    - Recall = 
