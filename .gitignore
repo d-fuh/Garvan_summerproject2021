@@ -5,6 +5,7 @@
 *.vcf.gz
 *.tsv.gz
 *.DS_Store
+worknote.txt
 
 # Citations
 Citations/*.*
