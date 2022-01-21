@@ -16,6 +16,7 @@ NA12878_benchmark/**/*.nb.html
 
 # AnnotSV visualisation files
 NA12878_benchmark/AnnotVis/*.*
+Germline/AnnotVis/*.*
 
 # Items from previous version
 NA12878_benchmark/Version_previous/**/*.*
