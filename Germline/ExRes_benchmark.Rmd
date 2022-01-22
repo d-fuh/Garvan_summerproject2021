@@ -248,6 +248,8 @@ CDS %>%
     geom_bar() + 
     theme_bw() +
     labs(x="SV type", y="Count") + scale_fill_discrete(name = "SV type")
+
+rm(sample_size)
 ```
 
 
@@ -276,20 +278,25 @@ CDS %>%
 
 
 ```{r}
-## TEST WORKFLOW TO BE COMPLETED
-
-ExRes %>% filter(ACMG_class %in% c("full=4", "full=5")) %>% ## select pathogenic variants 
-  #filter(Caller_count >= 3) %>% ## TODO new variable we will introduce at section 3
+# 
+ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select pathogenic variants 
+  #filter(Caller_count >= 3) %>% ## TODO confidence of call based on num of caller consensus
   filter(Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>% ## CDS-affecting
-  #filter(Tissue == "which") -> elite.variants.which ## TODO new variable to introduce at the end of (last) section 5-1
+  #filter(Tissue == "which") %>% ## TODO specify tissue affected, if available (Gene_name could help?)
 
-  filter(FILTER == "PASS") -> elite_variants_exres
-```
-
-```{r}
-# further trimming the df to variables we're interested in clinically
-
-
+# selecting only variables we are interested in clinically
+  subset(
+    select=c("SV_chrom",	"SV_start",	"SV_end",	"SV_length",	"SV_type", ## basic SV info
+             "ID",	"REF",	"ALT",	"FILTER", "ExResID", "Caller", "Annotation_mode", ## basic SV profile
+             "CytoBand",	"Gene_name",	"Gene_count", "Location", "Location2", ## gene profile
+             "Exon_count", "Frameshift", ## exon num / FS
+             "Intersect_start", "Intersect_end", ## what are these?
+             "Overlapped_CDS_length", "Overlapped_CDS_percent", ## CDS overlap
+             "ACMG_class",	"GenCC_disease", "GenCC_moi", "GenCC_classification", ## ACMG + GenCC clinical database 
+             "ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ", ## ExAC Z scores
+             "GnomAD_pLI",	"ExAC_pLI" ## GnomAD/ExAC pLIs
+                )
+  ) -> elite_variants_exres
 
 # write to csv for further use
 write.csv(elite_variants_exres, "elite_SV_ExRes.csv")
@@ -299,8 +306,14 @@ write.csv(elite_variants_exres, "elite_SV_ExRes.csv")
 
 
 
-
-
+```{r}
+# pLI: score indicating gene intolerance to a loss of function variation
+elite_variants_exres %>%
+  ggplot() + aes(x=GnomAD_pLI, y=ExAC_pLI, color=SV_chrom) + geom_point(size = 0.75) +
+  theme_classic() +
+  scale_color_discrete(name = "Chromosome") + 
+  theme(panel.background = element_rect(fill="grey12"))
+```
 
 
 
