@@ -20,15 +20,18 @@ ExRes <- read_csv("ExRes.csv")
 
 ### 1. FILTER == "PASS": Processed
 
-### 2. Reordering chromosome labels
+### 2. Removing NA levels/unclear variables
+```{r}
+# ExRes[1:2] <- list(NULL) ## careful with column order
+# or more safely:
+ExRes$...1 <- NULL
+ExRes$...2 <- NULL
+```
+
+### 3. Reordering chromosome labels
 ```{r}
 # Reordering SV_chrom axis
 ExRes$SV_chrom <- factor(ExRes$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
-```
-
-### 3. Removing NA levels/unclear variables
-```{r}
-ExRes <- subset(ExRes, -1, -2)
 ```
 
 
@@ -53,7 +56,7 @@ library(RColorBrewer)
 table(ExRes$SV_chrom)
 ```
 
-#### 1-1. SV location by callers
+#### 1-1. SV location by sample
 
 ```{r}
 # there are duplicates so this isn't an accurate graph
@@ -62,7 +65,7 @@ ExRes %>%
 ggplot(aes(x = SV_chrom, fill=Caller)) +
     geom_bar() +
     theme_bw() +
-    labs(x="Chromosome", y="count") + scale_fill_brewer(palette = "Set2")
+    labs(x="Chromosome", y="Count") + scale_fill_brewer(palette = "Set2")
 ```
 
 
@@ -72,6 +75,7 @@ ggplot(aes(x = SV_chrom, fill=Caller)) +
 #### 2-1. SV type between callers
 
 ```{r message=FALSE}
+# again, multiple callers can call the same variant, so include this as a warning in presentation.
 sample_size = ExRes %>% group_by(SV_type) %>% summarize(num=n())
 
 ExRes %>%
@@ -93,6 +97,7 @@ rm("sample_size")
 #### 3-1. SV length by caller
 
 ```{r}
+# similarly, duplicate calls is an issue
 ExRes %>% filter(!is.na(SV_length)) %>%
   filter(SV_length != 0) %>%
   mutate(SV_length = abs(SV_length)) %>%
@@ -112,11 +117,13 @@ ExRes %>% filter(!is.na(SV_length)) %>%
 ggplot(ExRes) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
   theme_classic() + 
-  ylab("Count") +
-  scale_color_brewer(name = "SV type", palette = "Set2") +
+  scale_color_brewer(name = "SV type", palette = "Set1") +
   scale_x_log10(name = "SV size (log-scaled)", 
                 breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
-                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb"))
+                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  scale_y_log10(name = "Counts (log-scaled)",
+                breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
+                label = c("10", "100", "1k", "10k", "100k"))
 ```
 
 
@@ -136,7 +143,7 @@ ggplot(ExRes) + aes(x=abs(SV_length), color = SV_type) +
 
 
 
-### 5. ACMG class of variants
+### 5. ACMG class of variants (essentially unpresentable as many caveats)
 
 ```{r}
 table(ExRes$ACMG_class)
@@ -162,7 +169,7 @@ rm("sample_size")
 Try removing ACMG = NA entries:
 
 ```{r message=FALSE}
-filter(ExRes, !is.na(ACMG_class)) %>%
+filter(ExRes, !is.na(ACMG_class)) %>% filter(ACMG_class != "full=NA") %>%
 
 ggplot(aes(x = ACMG_class, fill=SV_type)) +
     geom_bar() +
@@ -174,13 +181,6 @@ ggplot(aes(x = ACMG_class, fill=SV_type)) +
 
 
 ### 6. Detected variants affecting CDS
-
-```{r}
-table(ExRes$Location2)
-```
-
-This task requires AM == "Split".
-
 
 #### 6-1. CDS-affecting SVs
 
@@ -201,8 +201,11 @@ For a clearer plot:
 ```{r}
 # subset of AM=split data frame containing CDS-affecting entries --- AnnotSV-called
 CDS <- filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR"))
+```
 
-# main plot
+
+```{r}
+# these plots have scaling problems. WHY?
 sample_size = CDS %>% group_by(Location2) %>% summarize(num=n())
 
 CDS %>%
@@ -210,19 +213,21 @@ CDS %>%
   mutate(topos = paste0(Location2, "\n (n=", num, ")")) %>%
 
 ggplot(aes(x = topos, fill=SV_type)) +
-    geom_bar() + scale_y_sqrt(breaks = c(10^4, 10^5, 2*10^5, 3*10^5), 
-                              label = c("10 K", "100 K", "200 K", "300K")) +
+    geom_bar() + scale_y_continuous(trans = "log1p", 
+                                    breaks = c(50, 1e3, 1e4, 1e5),
+                                    label = c("50", "1K", "10 K", "100 K")) +
     theme_bw() +
     labs(x="Gene topology", y="Count") + scale_fill_discrete(name = "SV type") 
 
 rm("sample_size")
 
 
-# try facet_wrap
+# w/ facet_wrap
 CDS %>%
-  ggplot(.) + aes(x = SV_type, fill=SV_type) + scale_y_continuous(trans = "log1p", 
-                                                                  breaks = c(50, 1e3, 1e4, 1e5),
-                                                                  label = c("50", "1K", "10 K", "100 K")) +
+  ggplot(.) + aes(x = SV_type, fill=SV_type) + 
+  scale_y_continuous(trans = "log1p", 
+                     breaks = c(50, 1e3, 1e4, 1e5),
+                     label = c("50", "1K", "10 K", "100 K")) +
     geom_bar() + 
     facet_wrap( ~Location2) +
     theme_bw() +
