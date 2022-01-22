@@ -14,12 +14,12 @@ library(tidyverse)
 
 
 # Reading in annotated files for each of the six ExRes samples
-ER019_SAR1N <- read_tsv("ER019_SAR1N_annot.tsv")  ## sample 1
-ER052_MEL1N <- read_tsv("ER052_MEL1N_annot.tsv")  ## sample 2, etc
-ER057_MEL2N <- read_tsv("ER057_MEL2N_annot.tsv")
-ER095_MEL3N <- read_tsv("ER095_MEL3N_annot.tsv")
-ER108_MEL5N <- read_tsv("ER108_MEL5N_annot.tsv")
-ER118_MEL6N <- read_tsv("ER118_MEL6N_annot.tsv")
+ER019_SAR1N <- read_csv("ER019_SAR1N_annot.csv")  ## sample 1
+ER052_MEL1N <- read_csv("ER052_MEL1N_annot.csv")  ## sample 2, etc
+ER057_MEL2N <- read_csv("ER057_MEL2N_annot.csv")
+ER095_MEL3N <- read_csv("ER095_MEL3N_annot.csv")
+ER108_MEL5N <- read_csv("ER108_MEL5N_annot.csv")
+ER118_MEL6N <- read_csv("ER118_MEL6N_annot.csv")
 
 
 # Append sample ID to each frame before joining
