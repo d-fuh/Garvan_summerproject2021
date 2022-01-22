@@ -3,14 +3,21 @@ library(tidyverse)
 ###################################################################################################################
 ######################## Generate ERXXX.csv from AnnotSV-annotated files from all callers #########################
 ###################################################################################################################
-# Replace "ERXXX_XXXXX" with correct sample ID
+# Replace "ER019_SAR1N" with correct sample ID
+# Sample list
+## ER019_SAR1N
+## ER052_MEL1N
+## ER057_MEL2N
+## ER095_MEL3N
+## ER108_MEL5N
+## ER118_MEL6N
 
 # Reading in annotated files
-delly.annot <- read_tsv("AnnotSV_ERXXX_XXXXX_delly.tsv")
-manta.annot <- read_tsv("AnnotSV_ERXXX_XXXXX_manta.tsv")
-melt.annot <- read_tsv("AnnotSV_ERXXX_XXXXX_melt.tsv")
-wham.annot <- read_tsv("AnnotSV_ERXXX_XXXXX_wham.tsv")
-svaba.annot <- read_tsv("AnnotSV_ERXXX_XXXXX_svaba.tsv")
+delly.annot <- read_tsv("AnnotSV_ER019_SAR1N_delly.tsv")
+manta.annot <- read_tsv("AnnotSV_ER019_SAR1N_manta.tsv")
+melt.annot <- read_tsv("AnnotSV_ER019_SAR1N_melt.tsv")
+wham.annot <- read_tsv("AnnotSV_ER019_SAR1N_wham.tsv")
+svaba.annot <- read_tsv("AnnotSV_ER019_SAR1N_svaba.tsv")
 
 # Assigning callers
 delly.annot$Caller <- "Delly"
@@ -37,11 +44,11 @@ rm("delly.annot"); rm("manta.annot"); rm("melt.annot"); rm("wham.annot"); rm("sv
 
 
 # Final filtering
-filter(all.annot, FILTER == "PASS") -> ERXXX_XXXXX_annot
+filter(all.annot, FILTER == "PASS") -> ER019_SAR1N_annot
 
 # Write in csv for later use
-write.csv(ERXXX_XXXXX_annot, "ERXXX_XXXXX_annot.csv")
+write.csv(ER019_SAR1N_annot, "ER019_SAR1N_annot.csv")
 
 # Clear intermediate files
 rm(all.annot)
-rm(ERXXX_XXXXX_annot)
+rm(ER019_SAR1N_annot)
