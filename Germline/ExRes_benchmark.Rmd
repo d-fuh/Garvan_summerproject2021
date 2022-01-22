@@ -1,0 +1,677 @@
+---
+title: "Benchmarking Structural Variant Callers from ExRes cohort data"
+author: 
+  David Fuh, <br/>
+  Summer Intern, <br/>
+  Garvan Institute of Medical Research, 
+  Kinghorn Centre for Clinical Genomics
+output: html_notebook
+---
+
+# Main 
+
+## Data import
+```{r}
+ExRes <- read_csv("ExRes.csv")
+```
+
+
+## Data subsetting & processing
+
+### 1. FILTER == "PASS": Processed
+
+### 2. Reordering chromosome labels
+```{r}
+# Reordering SV_chrom axis
+ExRes$SV_chrom <- factor(ExRes$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
+```
+
+### 3. Removing NA levels/unclear variables
+```{r}
+ExRes <- subset(ExRes, -1, -2)
+```
+
+
+## Packages
+
+```{r message=FALSE}
+library(tidyverse)
+library(ggthemes)
+library(ggforce)
+library(cowplot)
+library(egg)
+library(viridis)
+library(RColorBrewer)
+```
+
+
+## Analysis
+
+### 1. SV call location
+
+```{r}
+table(ExRes$SV_chrom)
+```
+
+#### 1-1. SV location by callers
+
+```{r}
+# there are duplicates so this isn't an accurate graph
+ExRes %>%
+
+ggplot(aes(x = SV_chrom, fill=Caller)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="Chromosome", y="count") + scale_fill_brewer(palette = "Set2")
+```
+
+
+
+### 2. Types of Structural Variants
+
+#### 2-1. SV type between callers
+
+```{r message=FALSE}
+sample_size = ExRes %>% group_by(SV_type) %>% summarize(num=n())
+
+ExRes %>%
+  left_join(sample_size) %>%
+  mutate(svtype = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = svtype, fill=Caller)) +
+    geom_bar() + #scale_y_log10() +
+    theme_bw() + scale_fill_brewer(palette = "Set2") +
+    labs(x="Type of SV", y="Count")
+
+rm("sample_size")
+```
+
+
+
+### 3. Size and length of structural variants detected
+
+#### 3-1. SV length by caller
+
+```{r}
+ExRes %>% filter(!is.na(SV_length)) %>%
+  filter(SV_length != 0) %>%
+  mutate(SV_length = abs(SV_length)) %>%
+  
+  ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + geom_boxplot() + 
+  theme_bw() + scale_fill_brewer(palette = "Set2") +
+  scale_y_log10(breaks=c(10, 10^2, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8), 
+                labels=c("10 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  
+  ylab("SV size (log-scaled)") + xlab("")
+```
+
+
+#### 3-2. SV length vs SV type 
+
+```{r warning=FALSE, message=FALSE}
+ggplot(ExRes) + aes(x=abs(SV_length), color = SV_type) + 
+  geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
+  theme_classic() + 
+  ylab("Count") +
+  scale_color_brewer(name = "SV type", palette = "Set2") +
+  scale_x_log10(name = "SV size (log-scaled)", 
+                breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
+                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb"))
+```
+
+
+
+### 4. Number of variants detected by all methods
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 5. ACMG class of variants
+
+```{r}
+table(ExRes$ACMG_class)
+```
+
+
+```{r message=FALSE}
+sample_size = ExRes %>% group_by(ACMG_class) %>% summarize(num=n())
+
+ExRes %>%
+  left_join(sample_size) %>%
+  mutate(ACMG.class = paste0(ACMG_class, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = ACMG.class, fill=SV_type)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="ACMG class", y="Count") + 
+    scale_fill_discrete(name = "SV type")
+
+rm("sample_size")
+```
+
+Try removing ACMG = NA entries:
+
+```{r message=FALSE}
+filter(ExRes, !is.na(ACMG_class)) %>%
+
+ggplot(aes(x = ACMG_class, fill=SV_type)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="ACMG class", y="count") +
+    scale_fill_discrete(name = "SV type")
+```
+
+
+
+### 6. Detected variants affecting CDS
+
+```{r}
+table(ExRes$Location2)
+```
+
+This task requires AM == "Split".
+
+
+#### 6-1. CDS-affecting SVs
+
+```{r}
+table(ExRes$Location2)
+```
+
+We are interested in the variant calls affecting CDS regions. These include:
+```{r}
+filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>%
+  ggplot(aes(x = Location2, fill=SV_type)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="Gene topology", y="Count")
+```
+
+For a clearer plot:
+```{r}
+# subset of AM=split data frame containing CDS-affecting entries --- AnnotSV-called
+CDS <- filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR"))
+
+# main plot
+sample_size = CDS %>% group_by(Location2) %>% summarize(num=n())
+
+CDS %>%
+  left_join(sample_size) %>%
+  mutate(topos = paste0(Location2, "\n (n=", num, ")")) %>%
+
+ggplot(aes(x = topos, fill=SV_type)) +
+    geom_bar() + scale_y_sqrt(breaks = c(10^4, 10^5, 2*10^5, 3*10^5), 
+                              label = c("10 K", "100 K", "200 K", "300K")) +
+    theme_bw() +
+    labs(x="Gene topology", y="Count") + scale_fill_discrete(name = "SV type") 
+
+rm("sample_size")
+
+
+# try facet_wrap
+CDS %>%
+  ggplot(.) + aes(x = SV_type, fill=SV_type) + scale_y_continuous(trans = "log1p", 
+                                                                  breaks = c(50, 1e3, 1e4, 1e5),
+                                                                  label = c("50", "1K", "10 K", "100 K")) +
+    geom_bar() + 
+    facet_wrap( ~Location2) +
+    theme_bw() +
+    labs(x="Gene topology", y="Count") + scale_fill_discrete(name = "SV type")
+```
+
+
+To have a closer look on the variants affecting specifically only the CDS region, we subset:
+```{r}
+sample_size = CDS %>% filter(Location2 == "CDS") %>% group_by(SV_type) %>% summarize(num=n())
+
+CDS %>%
+  filter(Location2 == "CDS") %>%
+  left_join(sample_size) %>%
+  mutate(SV.type = paste0(SV_type, "\n (n=", num, ")")) %>%
+
+  ggplot(.) + aes(x = SV.type, fill=SV_type) +
+    geom_bar() + 
+    theme_bw() +
+    labs(x="SV type", y="Count") + scale_fill_discrete(name = "SV type")
+```
+
+
+
+
+#### 6-2. The elite list*** important results
+
+<1st layer: AnnotSV input>
+
+    Raw call set %>% filter(PASS) %>% filter(ACMG = {4,5}) %>% 
+    
+    [R scripts]       [R scripts]           [Task 4]
+    
+<2nd layer>    
+
+          filter(Called by e.g. at least 3 callers out of 5 used) %>% 
+          [Task 3]
+          
+          
+          filter(CDS-affecting) %>% 
+          [Task 5]
+          
+          
+          filter(Known to affect XX tissue)
+          [This task]
+
+
+```{r}
+## TEST WORKFLOW TO BE COMPLETED
+
+ExRes %>% filter(ACMG_class %in% c("full=4", "full=5")) %>% ## select pathogenic variants 
+  #filter(Caller_count >= 3) %>% ## TODO new variable we will introduce at section 3
+  filter(Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>% ## CDS-affecting
+  #filter(Tissue == "which") -> elite.variants.which ## TODO new variable to introduce at the end of (last) section 5-1
+
+  filter(FILTER == "PASS") -> elite_variants_exres
+```
+
+```{r}
+# further trimming the df to variables we're interested in clinically
+
+
+
+# write to csv for further use
+write.csv(elite_variants_exres, "elite_SV_ExRes.csv")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 7. nMDS-ExAC Z scores: A bundled measure of functional constraints per gene
+
+The ExAC Z scores (read more at where?) are:
+
+> ExAC_delZ,	ExAC_dupZ,	ExAC_cnvZ,	ExAC_synZ,	ExAC_misZ
+
+
+Since they are Z scores ... they should approximately follow known distribution (SND)...right?
+
+
+#### Workflow
+
+--> Extract all ExAC data into numeric mtx
+```{r}
+# selecting a subset of SV size < 20 kb 
+# as we are evaluating whether ExAC Z scores together are a good representation/estimate of 
+# "functional constraint" corresponding to a gene-variant pair. We are hence omitting larger variants
+# that likely span multiple genes.
+
+# Also, vegan::metaMDS doesn't seem tolerate huge data frames well.
+
+large.full %>%
+  filter(between(SV_length, -20000, 20000)) %>%
+  subset(select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ")) -> Z.mtx
+```
+
+--> Already standardised?
+
+
+
+--> No NA, beware of zeros
+```{r}
+Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes all rows containing any NA
+
+#select(Z.mtx, -ExAC_misZ) -> Z.mtx
+
+#Z.mtx <- decostand(Z.mtx, method= "max") ## TODO: omittable? Z score already a standardised measure.
+
+round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ
+```
+
+
+```{r}
+# need to subsample. Last checked: Cap = 600
+Z.mtx[sample(nrow(Z.mtx), 600), ] -> Z.mtx.sample
+```
+
+
+--> Apply similarity measure and MDS compression
+```{r eval=FALSE}
+MDS.S <- metaMDS(Z.mtx.sample, distance = "euclidean", autotransform = FALSE, trace = FALSE) ##TODO: proper distance measure?
+```
+
+
+--> Check stress level of MDS
+```{r}
+MDS.S$stress ## Checking MDS stress for interpretation
+MDS.S$stress <= 0.20
+```
+
+
+Recall the standard level of acceptance of MDS stress = 0.20.
+
+
+--> Obtain Cartesian coordinate in S_mtx
+```{r}
+MDS.xy <- data.frame(MDS.S$points) ## Sending the cartesian coordinates in MDS profile to MDS.xy
+```
+
+
+--> Send coordinate to new dummy df + assign factors of interest (e.g. Caller)
+
+#### Assigning factors: Great code
+```{r}
+# precious codes
+MDS.xy$Caller = large.full[match(row.names(MDS.xy), row.names(large.full)),"Caller"]
+
+MDS.xy$ACMG_class = large.full[match(row.names(MDS.xy), row.names(large.full)),"ACMG_class"]
+
+MDS.xy$SV_type = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_type"]
+
+MDS.xy$SV_length = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_length"]
+
+MDS.xy$SV_chrom = large.full[match(row.names(MDS.xy), row.names(large.full)),"SV_chrom"]
+```
+
+
+--> Run MDS plot and annotate with factor levels 
+
+#### 7-1. ExACZ ~ Caller
+```{r}
+# MDS: (1) By Caller
+ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
+  
+  #scale_colour_manual(values = wes_palette("GrandBudapest2")) +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey15", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.text = element_text(size = 11), 
+        legend.title = element_text(size = 13.5),
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores of variants grouped by variant caller in NA12878 \n (n=600)")
+
+ggsave2("MDS_ExAC_Z_by_caller_NA12878.png")
+```
+
+No apparent clustering pattern (by Caller; n = 600).
+
+
+#### 7-2. ExACZ ~ ACMG class
+```{r}
+# MDS: (2) By ACMG class of SV
+MDS.xy$ACMG_class <- as.factor(MDS.xy$ACMG_class) ## coerce as factor level (discrete) instead of numeric (continuous)
+
+ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() +
+  
+  scale_colour_viridis(discrete = TRUE, name = "ACMG class") +
+  
+    theme(legend.key = element_rect(fill = NA),
+        legend.text = element_text(size = 11),
+        legend.title = element_text(size = 12),
+        axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey97", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey86", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank()
+        ) + 
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by ACMG class of variants in NA12878 \n (n=600)")
+
+ggsave2("MDS_ExAC_Z_by_ACMG_class_discrete_NA12878.png")
+```
+
+
+#### 7-3. ExACZ ~ SV type
+```{r}
+# MDS: (3) By SV type
+ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.key = element_rect(fill = NA)) +
+  
+  scale_color_discrete(name = "SV type") +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by type of SV from NA12878 (n=600)")
+
+ggsave2("MDS_ExAC_Z_by_SV_type_NA12878.png")
+```
+
+```{r}
+table(as.factor(MDS.xy$SV_type))
+```
+
+
+```{r}
+# Try facet_wrap
+MDS.xy %>% filter(SV_type != "SVA") %>%
+  ggplot(.) + aes(MDS1, MDS2, color = SV_type) + geom_point(size = 1) +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  scale_color_discrete(name = "SV type") +
+  
+  facet_wrap( ~SV_type)
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by type of structural \n variants in NA12878 (n=600)")
+
+ggsave2("MDS_ExAC_Z_by_SV_type_NA12878_wrapped.png")
+```
+
+
+
+#### 7-4. ExACZ ~ SV length
+```{r}
+# MDS: (4) By SV length
+MDS.xy %>% filter(!is.na(SV_length)) %>% mutate(SV_length = log10(abs(SV_length))) %>%
+
+ggplot(aes(MDS1, MDS2, color = SV_length)) + geom_point(size = 1) +
+  
+  scale_color_viridis(option = "A") +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.key = element_rect(fill = NA)) +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores grouped by SV length in NA12878, n=600")
+
+ggsave2("MDS_ExAC_Z_by_SV_length_NA12878.png")
+```
+
+
+#### 7-5. ExACZ ~ variant location
+```{r}
+# MDS: (5) By variant location
+ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
+  
+  theme(axis.title = element_blank(),
+        panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.key = element_rect(fill = NA)) +
+  
+  scale_color_discrete(name = "Chromosome") +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5))) +
+  
+  ggtitle("NMDS plot of five ExAC Z scores as measure of functional constraint \n grouped by chromosomal location from NA12878  (n=600)")
+
+ggsave2("MDS_ExAC_Z_by_location_NA12878.png")
+```
+
+
+### 8. PCA:
+
+#### 8-1. ExAC_Z continued: ACMG score and ExAC Z measure of functional constraint
+```{r}
+# using entire data frame instead of subsample as in MDS restrictions
+Z.pca <- princomp(Z.mtx)
+```
+
+```{r}
+# first-stage analysis
+plot(Z.pca$scores) ## shows visuals of what first two PCs look like. can specify which = c(a,b)
+screeplot(Z.pca) ## %var explained by each PC
+summary(Z.pca) ## important statistics of each PC, mostly %var accounted
+loadings(Z.pca) ## "loadings" in PCA refers to the linear (de)composition of each PC
+```
+
+Select PC1,2 = ~ 80%; PC1,2,3 = ~ 91% (Quite low!)
+
+#### 2D PCA (80%)
+```{r}
+# PCA plot: 2D
+Z.coor <- data.frame(Z.pca$scores)
+
+# assigning factors
+Z.coor$Caller = large.full[match(row.names(Z.coor), row.names(large.full)),"Caller"]
+Z.coor$ACMG_class = large.full[match(row.names(Z.coor), row.names(large.full)),"ACMG_class"]
+Z.coor$SV_type = large.full[match(row.names(Z.coor), row.names(large.full)),"SV_type"]
+```
+
+
+```{r}
+# Plot 2D PCA
+## by SV type
+ggplot(Z.coor) + aes(Comp.1, Comp.2, color=SV_type) + geom_point() +
+   theme_bw()
+
+## by Caller
+ggplot(Z.coor) + aes(Comp.1, Comp.2, color=Caller) + geom_point() +
+   theme_bw()
+
+## by ACMG class
+Z.coor$ACMG_class <- as.factor(Z.coor$ACMG_class) ## discrete leveling
+
+ggplot(Z.coor) + aes(Comp.1, Comp.2, color=ACMG_class) + geom_point() +
+  scale_colour_viridis(discrete = TRUE) +
+   theme_bw()
+```
+
+
+Consider subsample to n=600:
+
+#### Subsampling: n=600
+```{r}
+# sample down to n=600
+Z.coor[sample(nrow(Z.coor), 600), ] -> Z.pca.sample
+
+# Plot 2D PCA
+## by SV type
+ggplot(Z.pca.sample) + aes(Comp.1, Comp.2, color=SV_type) + geom_point() +
+   theme_bw()
+
+## by Caller
+ggplot(Z.pca.sample) + aes(Comp.1, Comp.2, color=Caller) + geom_point() +
+   theme_bw()
+
+## by ACMG class
+ggplot(Z.pca.sample) + aes(Comp.1, Comp.2, color=ACMG_class) + geom_point() +
+  scale_colour_viridis(discrete = TRUE) +
+   theme_bw()
+```
+
+
+```{r}
+Z.pca.sample %>% filter(SV_type != "SVA") %>%
+  ggplot(.) + aes(Comp.1, Comp.2, color=SV_type) + geom_point() +
+   theme_bw() + facet_wrap( ~SV_type)
+```
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Sandbox
+
+## Create a smaller subset of the master file
+
+```{r}
+# AM=full across whole SVs
+profile.full <- subset(benchmark.full, 
+       
+       select=c("SV_chrom",	"SV_start",	"SV_end",	"SV_length", "SV_type",	## basic SV info
+                "ID",	"REF",	"ALT",	"QUAL",	"FILTER",	"INFO", "Coverage", "Caller", ## basic SV profile
+                "AnnotSV_ranking_score",	"AnnotSV_ranking_criteria"
+                ))
+
+
+# AM=split across single genes
+profile.split <- subset(benchmark.split,
+                       
+        select=c("SV_chrom",	"SV_start",	"SV_end",	"SV_length",	"SV_type", ## basic SV info
+                "ID",	"REF",	"ALT",	"QUAL",	"FILTER",	"INFO", "Coverage", "Caller", ## basic SV profile
+                "CytoBand",	"Gene_name",	"Gene_count", "Location2", ## gene profile
+                "n_Exon", "Frameshift", "Overlapped_CDS_length", "Overlapped_CDS_percent", ## topological variables
+                "ACMG_class",	"GenCC_disease", "GenCC_moi", "GenCC_classification", ## ACMG + GenCC clinical database 
+                "ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ", ## ExAC Z scores
+                "GnomAD_pLI",	"ExAC_pLI", ## GnomAD/ExAC pLIs
+                ))
+```
+
+
+# Footnotes
+
+
