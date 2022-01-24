@@ -44,7 +44,7 @@ library(viridis)
 table(ExRes$SV_chrom)
 ```
 
-### 1-1. SV location by sample
+### 1-1. SV location by caller
 
 ```{r}
 # there are duplicates so this isn't an accurate graph
@@ -56,8 +56,27 @@ ggplot(aes(x = SV_chrom, fill=Caller)) +
   scale_fill_paletteer_d("nationalparkcolors::Badlands") +
   labs(x="Chromosome", y="Count")  
     
-cowplot::ggsave2("SV_count_caller_exres.png")
+cowplot::ggsave2("SV_count_chr_caller_exres.png")
 ```
+(Superimpose line graph of chromosomal length on diaxis plot)
+
+### 1-2. SV location by ExRes ID
+
+```{r}
+# there are duplicates so this isn't an accurate graph
+# version A
+ExRes %>% filter(Annotation_mode == "full") %>%
+
+ggplot(aes(x = SV_chrom, fill = ExResID)) +
+  geom_bar(aes(alpha=..count..), position = "fill") +
+  theme_bw() + 
+  scale_alpha_continuous(name = "Count") +
+  scale_fill_paletteer_d("calecopal::kelp1", name = "ExRes ID") +
+  labs(x="Chromosome", y="Count")  
+    
+cowplot::ggsave2("SV_count_dist_chr_ID_exres.png")
+```
+
 
 
 
@@ -75,9 +94,9 @@ ExRes %>%
   mutate(svtype = paste0(SV_type, "\n (n=", num, ")")) %>%
 
 ggplot(aes(x = svtype, fill=Caller)) +
-    geom_bar() +
+    geom_bar(position = "dodge") +
     theme_bw() + scale_fill_paletteer_d("nationalparkcolors::Badlands") +
-    labs(x="Type of SV", y="Count")
+    labs(x="", y="Count")
 
 cowplot::ggsave2("SV_type_caller_exres.png")
 
@@ -164,6 +183,8 @@ ggsave2("two_line_plots_SV_type_exres.png")
 ```
 
 
+Problem: 1) BND (svaba) calls ignored 2) INS = ALU + LINE1 + SVA + ... (the bottom graph didn't synthesise them)
+
 
 ## 4. Number of variants detected by all methods
 
@@ -244,21 +265,24 @@ CDS <- filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'
 
 To have a closer look on the variants affecting specifically only the CDS region, we subset:
 ```{r}
-sample_size = CDS %>% filter(Location2 == "CDS") %>% group_by(SV_type) %>% summarize(num=n())
+sample_size = CDS %>% group_by(SV_type) %>% summarize(num=n())
 
 CDS %>%
-  filter(Location2 == "CDS") %>%
   left_join(sample_size) %>%
   mutate(SV.type = paste0(SV_type, "\n (n=", num, ")")) %>%
 
-  ggplot(.) + aes(x = SV.type, fill=SV_type) +
-    geom_bar() + 
+  ggplot(.) + aes(x = SV.type, fill=ExResID) +
+    geom_bar(aes(alpha=..count..), position = "fill") + 
+    scale_alpha_continuous(name = "Count", range = c(0.2, 1)) +
     theme_bw() +
-    labs(x="SV type", y="Count") + scale_fill_discrete(name = "SV type")
+    scale_fill_paletteer_d("calecopal::kelp1", name = "Ex Res ID") +
+    labs(x="", y="Count")
+
+cowplot::ggsave2("CDS_SV_type_ID_exres.png")
 
 rm(sample_size)
 ```
-
+(run multi ANOVA: In each SV type, which patient has the most sig. deviation? Star it.)
 
 
 
