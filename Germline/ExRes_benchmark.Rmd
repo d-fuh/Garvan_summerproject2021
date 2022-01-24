@@ -111,7 +111,8 @@ cowplot::ggsave2("SV_size_exres.png")
 ### 3-2. SV length vs SV type 
 
 ```{r}
-ggplot(ExRes) + aes(x=abs(SV_length), color = SV_type) + 
+ExRes %>% filter(Annotation_mode == "split") %>%
+  ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
   theme_classic() + 
   paletteer::scale_colour_paletteer_d("khroma::bright", name = "SV type") +
@@ -129,7 +130,8 @@ cowplot::ggsave2("line_plot_SV_type_ExRes.png")
 ```{r}
 # facet_wrap/ggarrange to partition SV subsets by major/minor type
 # subset 1. minor SV types (ALU, LINE1, SVA)
-ExRes %>% filter(SV_type %in% c("ALU", "LINE1", "SVA")) %>%
+ExRes %>% filter(Annotation_mode == "split") %>%
+  filter(SV_type %in% c("ALU", "LINE1", "SVA")) %>%
   ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
   theme_classic() + 
@@ -144,7 +146,8 @@ ExRes %>% filter(SV_type %in% c("ALU", "LINE1", "SVA")) %>%
 # subset 2. major SV types (others)
 "%ni%" <- Negate("%in%")
 
-ExRes %>% filter(SV_type %ni% c("ALU", "LINE1", "SVA")) %>%
+ExRes %>% filter(Annotation_mode == "split") %>%
+  filter(SV_type %ni% c("ALU", "LINE1", "SVA")) %>%
   ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
   theme_classic() + 
@@ -185,9 +188,10 @@ table(ExRes$ACMG_class)
 
 
 ```{r message=FALSE}
-sample_size = ExRes %>% group_by(ACMG_class) %>% summarize(num=n())
+sample_size = ExRes %>% filter(Annotation_mode == "full") %>% group_by(ACMG_class) %>% summarize(num=n())
 
 ExRes %>%
+  filter(Annotation_mode == "full") %>%
   left_join(sample_size) %>%
   mutate(ACMG.class = paste0(ACMG_class, "\n (n=", num, ")")) %>%
 
@@ -281,7 +285,6 @@ rm(sample_size)
 
 ### elite_variant_exres
 ```{r}
-# 
 ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select pathogenic variants 
   #filter(Caller_count >= 3) %>% ## TODO confidence of call based on num of caller consensus
   filter(Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>% ## CDS-affecting
@@ -307,21 +310,19 @@ write.csv(CDS_variants_exres, "200K_CDS_SV_ExRes.csv")
 
 
 
+
+# II. Visualising high-dimensional data
+
 ```{r}
 # pLI: score indicating gene intolerance to a loss of function variation
-elite_variants_exres %>%
+ExRes %>% filter(Annotation_mode == "split") %>% .[sample(nrow(.), 200000), ] %>%
   ggplot() + aes(x=GnomAD_pLI, y=ExAC_pLI, color=SV_chrom) + geom_point(size = 0.75) +
   theme_classic() +
   scale_color_discrete(name = "Chromosome") + 
   theme(panel.background = element_rect(fill="grey12"))
+
+ggsave2("example_plot_exres_pli_scores.png")
 ```
-
-
-
-
-# II. Visualising high-dimensional data
-
-
 
 
 
