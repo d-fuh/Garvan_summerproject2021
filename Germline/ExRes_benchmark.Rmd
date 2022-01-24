@@ -8,6 +8,19 @@ author:
 output: html_notebook
 ---
 
+# Packages
+
+```{r message=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(paletteer)
+library(ggforce)
+library(cowplot)
+library(egg)
+library(viridis)
+```
+
+
 # Data import
 ```{r}
 ExRes <- read_csv("ExRes.csv")
@@ -20,19 +33,6 @@ ExRes$...2 <- NULL
 
 # Reordering SV_chrom axis
 ExRes$SV_chrom <- factor(ExRes$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "22", "X", "Y", "M"))
-```
-
-
-# Packages
-
-```{r message=FALSE}
-library(tidyverse)
-library(tidymodels)
-library(paletteer)
-library(ggforce)
-library(cowplot)
-library(egg)
-library(viridis)
 ```
 
 
@@ -178,8 +178,8 @@ ExRes %>% filter(Annotation_mode == "split") %>%
                 breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
                 label = c("10", "100", "1k", "10k", "100k")) -> p2
 
-egg::ggarrange(p1, p2, nrow = 2)
-ggsave2("two_line_plots_SV_type_exres.png")
+p3 <- grid.arrange(p1, p2, nrow = 2)
+ggsave2("two_line_plots_SV_type_exres.png", p3)
 ```
 
 
@@ -247,23 +247,17 @@ ggplot(aes(x = ACMG_class, fill=SV_type)) +
 table(ExRes$Location2)
 ```
 
-We are interested in the variant calls affecting CDS regions. These include:
-```{r}
-filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>%
-  ggplot(aes(x = Location2, fill=SV_type)) +
-    geom_bar() +
-    theme_bw() +
-    labs(x="Gene topology", y="Count")
-```
+Note that only split AM contains topology data (confirmed).
 
-For a clearer plot:
+
+### SV curation set: CDS-affecting only
 ```{r}
 # subset of AM=split data frame containing CDS-affecting entries --- AnnotSV-called
 CDS <- filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR"))
 ```
 
 
-To have a closer look on the variants affecting specifically only the CDS region, we subset:
+
 ```{r}
 sample_size = CDS %>% group_by(SV_type) %>% summarize(num=n())
 
@@ -286,7 +280,7 @@ rm(sample_size)
 
 
 
-### 6-2. The elite list*** important results
+### 6-2. Prioritised variant list
 
 <1st layer: AnnotSV input>
 
@@ -307,7 +301,8 @@ rm(sample_size)
           filter(Known to affect XX tissue)
           [This task]
 
-### elite_variant_exres
+
+### List curation
 ```{r}
 ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select pathogenic variants 
   #filter(Caller_count >= 3) %>% ## TODO confidence of call based on num of caller consensus
@@ -329,8 +324,126 @@ ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select path
   ) -> CDS_variants_exres
 
 # write to csv for further use
-write.csv(CDS_variants_exres, "200K_CDS_SV_ExRes.csv")
+#write.csv(CDS_variants_exres, "200K_CDS_SV_ExRes.csv")
 ```
+
+
+### 6-3. Analysis on prioritised variants
+
+```{r}
+# exon count and frameshift profile
+CDS_variants_exres %>%
+  ggplot() + aes(x=Location2, y=Frameshift, fill=sqrt(sqrt(sqrt(Exon_count)))) + geom_tile() +
+  scale_fill_paletteer_c("ggthemes::Sunset-Sunrise Diverging", name = "Exon count",
+                          labels = paste(c(1, 5, 25, 100, 250))) +
+  xlab("") + theme_bw()
+
+ggsave2("exon_count_frameshift_profile_exres.png")
+```
+
+```{r}
+# exon count and chromosome profile
+CDS_variants_exres %>%
+  ggplot() + aes(x=SV_chrom, y=Location2, fill=sqrt(sqrt(sqrt(Exon_count)))) + geom_tile() +
+  scale_fill_paletteer_c("ggthemes::Sunset-Sunrise Diverging", name = "Exon count", 
+                         labels = paste(c(1, 5, 25, 100, 250))) +
+  xlab("") + ylab("") + 
+  theme_bw() + theme(panel.grid.major = element_blank(), panel.background = element_rect(fill = "grey25"))
+
+ggsave2("exon_count_chr_profile_exres.png")
+```
+
+
+```{r}
+# ACMG and chromosome profile: Curated set <pathogenic & CDS-affecting & has length < 200K>
+CDS_variants_exres %>%
+  ggplot() + aes(x=SV_chrom, y=Location2, fill=ACMG_class) + geom_tile() +
+  scale_fill_viridis_d(name = "ACMG class") +
+  xlab("") + ylab("") + 
+  theme_bw() + theme(panel.grid.major = element_blank())
+
+#ggsave2("exon_count_chr_profile_exres.png")
+
+# With all CDS-affecting variants...
+CDS %>% filter(ACMG_class != "full=NA") %>%
+  ggplot() + aes(x=SV_chrom, y=Location2, fill=ACMG_class) + geom_tile() +
+  scale_fill_viridis_d(name = "ACMG class") +
+  xlab("") + ylab("") + 
+  theme_bw() + theme(panel.grid.major = element_blank())
+
+# Include cytobands
+CDS_variants_exres %>%
+  ggplot() + aes(x=SV_chrom, y=reorder(CytoBand, desc(CytoBand)), fill=ACMG_class) + 
+  geom_tile(aes(alpha = Gene_count)) +
+  scale_fill_viridis_d(name = "ACMG class") +
+  xlab("") + ylab("") +
+  theme_bw() + theme(panel.grid.major = element_blank(),
+                     axis.text.y=element_text(angle = 10, hjust = 0)) +
+  scale_y_discrete(guide = guide_axis(n.dodge=2))
+
+# With all CDS-affecting variants...
+CDS %>% filter(ACMG_class != "full=NA") %>%
+  ggplot() + aes(x=SV_chrom, y=reorder(CytoBand, desc(CytoBand)), fill=ACMG_class) + 
+  geom_tile(aes(alpha = Gene_count)) +
+  scale_fill_viridis_d(name = "ACMG class", labels = paste(c("1", "3", "4", "5"))) +
+  xlab("") + ylab("In Cytoband Order") +
+  theme_bw() + theme(panel.grid.major = element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank())
+
+ggsave2("ACMG_profile_by_location_exres.png")
+```
+
+```{r}
+# alternative version (darker background)
+CDS %>% filter(ACMG_class != "full=NA") %>%
+  ggplot() + aes(x=SV_chrom, y=reorder(CytoBand, desc(CytoBand)), fill=ACMG_class) + 
+  geom_tile(aes(alpha = Gene_count)) +
+  scale_fill_viridis_d(name = "ACMG class", labels = paste(c("1", "3", "4", "5"))) +
+  xlab("") + ylab("In Cytoband Order") +
+  theme_bw() + theme(panel.grid.major = element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank(),
+                     panel.background = element_rect(fill = "grey45"))
+
+ggsave2("ACMG_profile_by_location_exres_dark.png")
+```
+
+
+```{r}
+# ACMG class across genome among patients
+CDS %>% filter(ACMG_class != "full=NA") %>%
+  ggplot() + aes(x=SV_chrom, y=ExResID, fill=ACMG_class) + 
+  geom_tile(aes(alpha = Gene_count)) +
+  scale_fill_viridis_d(name = "ACMG class", labels = paste(c("1", "3", "4", "5"))) +
+  xlab("") + ylab("Ex Res ID") +
+  theme_bw() + theme(panel.grid.major = element_blank())
+```
+
+
+```{r}
+# Distribution of detected variant topology across each patient's genome
+CDS_variants_exres %>% 
+  ggplot() + aes(x=SV_chrom, fill=Location2) + 
+  geom_bar() + facet_wrap(~ExResID) +
+  scale_fill_discrete(name = "Topology") + ylab("Count") + xlab("") +
+  theme_bw() + theme(panel.grid.major = element_blank(),
+                     axis.text.x=element_text(angle = 30)) + 
+  scale_x_discrete(guide = guide_axis(n.dodge=2))
+
+ggsave2("variant_topology_by_exres_ID.png")
+```
+
+
+```{r}
+# Mode of inheritance (moi)
+
+```
+
+
+
+
+
+
+
+
+
 
 
 
