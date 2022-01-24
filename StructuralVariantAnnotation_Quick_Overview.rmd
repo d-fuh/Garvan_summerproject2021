@@ -1,0 +1,356 @@
+---
+title: "StructuralVariantAnnotation Quick Overview"
+author: "Ruining Dong, Daniel Cameron"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+vignette: >
+  %\VignetteIndexEntry{Structural Variant Annotation Package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(#echo = TRUE,
+  collapse = TRUE,
+  comment = "#>")
+```
+
+## Introduction
+This vignette outlines parsing and annotation of structural variants from Variant Call Format (VCF) using the `StructuralVariantAnnotation` package.
+`StructuralVariantAnnotation` contains useful helper functions for reading, comparing, and interpreting structural variant calls.
+`StructuralVariantAnnotation` The package contains functions for parsing VCFs from a number of popular callers, dealing with breakpoints involving two separate genomic loci encoded as `GRanges` objects, as well as identifying various biological phenomena.
+
+## Installation
+
+The *StructuralVariationAnnotation* package can be installed from *Bioconductor* as follows:
+
+```{r installation, eval=FALSE}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    #install.packages("BiocManager")
+BiocManager::install("StructuralVariantAnnotation")
+library(StructuralVariantAnnotation)
+```
+
+## Representing structural variants in VCF
+
+The [VCF standard](https://samtools.github.io/hts-specs/VCFv4.3.pdf) allows for four different structural variant notations.
+Here, we shall us a simple deletion as an example of the available notations:
+
+```
+CGTGTtgtagtaCCGTAA  chr sequence
+     -------        deleted bases
+```
+
+- Direct sequence notation
+
+```
+chr	5	sequence	TTGTAGTA	T	.	.
+```
+
+This is the format that most users will be familar with.
+It is the format used for small insertions and deletions.
+Unfortunately, it does not scale well to large events since both the `REF` and `ALT` sequences must be specified in full.
+For this reason, most structural variant callers will report events in a different notation.
+
+- Symbolic notation
+
+```
+chr	5	symbolic	T	<DEL>	.	.	SVTYPE=DEL;SVLEN=-7;END=12
+```
+
+In symbolic notation, the `ALT` is replaced with a special symbolic allele,
+optionally with a sub-type (e.g. `<DEL:ME>` for a deletion known to be a mobile element deletion).
+The size of the event is determined via the `SVLEN` and `END` fields.
+The VCF specifications recognises `<DEL>`, `<DUP>`, `<INS>`, `<INV>`, and `<CNV>` as top-level symoblic structural variant alleles with all other values taking on non-standard implementation-defined meaning.
+
+There are two problems with this representation.
+Firstly, it is ambiguous whether a caller reporting an event is making a breakpoint claim, a copy number change, or both.
+Secondly, this notation does not allow inter-chromosomal events to be represented.
+These require yet another notation
+
+- Breakend notation
+
+```
+chr	5	breakpoint1	T	T[chr:13[	.	.	SVTYPE=BND;MATEID=breakpoint2
+chr	13	breakpoint2	C	]chr:5]C	.	.	SVTYPE=BND;MATEID=breakpoint1
+```
+
+In this notation, a breakpoint is represented by a pair of breakend records, each containing the location of the two breakends and linked by their `ID` using the `MATEID` `INFO` field.
+Arbitrary rearrangements can be represented using breakend notation, including special-case syntax to represent the termination of a chromosome.
+
+
+Finally, the VCF specifications support one additional notation for structural variants: single breakends.
+
+- Single breakend notation
+
+```
+chr	5	breakend	T	T.	.	.	SVTYPE=BND
+```
+
+Single breakends are breakpoints in which only one side can be unambiguously determined.
+This can be due to one breakend being unable to be uniquely placed (e.g. a breakpoint into centromeric sequence),
+or due to the sequence of one side being novel with respect to the reference (e.g. a viral integration breakpoint).
+
+
+## Using GRanges for structural variants: a breakend-centric data structure
+
+Unlike breakpoint-centric data structures such as the `Pairs` object that `rtracklayer` uses to load BEDPE files, this package uses a breakend-centric notation.
+Breakends are stored in a GRanges object with strand used to indicate orientation and is consistent with VCF breakend notation.
+The position in the GRanges indicates the position of the base immediately adjacent to the breakpoint.
+`+` indicates that the breakpoint orientation is "forward" the derivative chromosome consists of the bases at and before the break position.
+`-` indicates that the breakpoint orientation is "backwards" the derivative chromosome consists of the bases at and after the break position.
+Breakpoints are represented using the `partner` field.
+The `partner` field contains the GRanges row name of the breakend at the other side of the breakpoint.
+Single breakends have an `NA` `partner` since the other side is unknown.
+
+This notation has a number of advantages over other repentation formations.
+Firstly, it allows both breakpoints and single breakends to be represented in a single data structure.
+Secondly, it simplifies annotation as most genomic annotations are for a genomic position, or a contiguous genomic region (e.g. genes, introns, exons, repeats, mappability).
+Finally, it provides a unified representation format regardless of the format used to represent the variant.
+
+Using our previous example, we can see that the direct sequence and symbolic representations require multiple rows to represent:
+```{r samplevariant,warning=FALSE, message=FALSE}
+suppressPackageStartupMessages(library(StructuralVariantAnnotation))
+vcf <- VariantAnnotation::readVcf(system.file("extdata", "representations.vcf", package = "StructuralVariantAnnotation"))
+gr <- c(breakpointRanges(vcf), breakendRanges(vcf))
+gr
+```
+
+These rows are linked backed to their originating VCF row through the `sourceId` field.
+All 3 breakpoint notations are identical when represented using the StructuralVariantAnnotation GRanges breakpoint notation.
+
+## Loading data from VCF
+
+StructuralVariantAnnotation is built on top of the Bioconductor package `VariantAnnotation`.
+VCF files are loaded using `VariantAnnotation::readVcf`, and converted to breakpoint GRanges notation using `breakpointRanges`
+Any non-structural variants such as single nucleotide variants in a VCF will be silently ignored by StructuralVariantAnnotation.
+More information about `VCF` objects can be found by consulting the vignettes in the VariantAnnotation package with `browseVignettes("VariantAnnotation")`.
+
+### Non-compliant VCFs
+
+StructuralVariantAnnotation has additional parsing logic to enable reading VCF from popular callers that do not conform to VCF specifications.
+Specically, StructuralVariantAnnotation supports the following:
+
+- `SVTYPE=RPL`. Used by Pindel to represent deletion-with-insertion events.
+- `INV3`, `INV5`. Used Manta and DELLY to indicate that an `<INV>` inversion call only includes one of the breakpoints required for an actual inversion.
+- `SVTYPE=TRA`/`CHR2`/`CT` Used by DELLY (and others) to indicate an inter-chromosomal breakpoint.
+- `SVTYPE=CTX`. BreakDancer-style notation used by TIGRA to indicate an inter-chromosomal breakpoint.
+
+## Ambiguous breakpoint positions
+
+A structural variant call can be ambiguous for one of two reasons.
+Firstly, a discordant read pair or read depth based caller can make `IMPRECISE` call as the caller itself is unsure of the breakpoint position.
+Second, homology at the breakpoint can result (See [Section 5.4.8 of the VCF version 4.3 specifications](https://samtools.github.io/hts-specs/VCFv4.3.pdf#page=22)) in multiple possible breakpoint positions resulting in identical sequence.
+This ambiguity is intrinsic to the call itself.
+
+StructuralVariantAnnotation incorporates both forms of ambiguity using both `CIPOS` and `HOMPOS` VCF fields into the GRanges breakend intervals.
+Breakend with ambiguity will have their `start` and `end` positions.
+
+These breakpoint positional ambiguity bounds can be removed by specifying `nominalPosition=FALSE` when calling `breakpointRanges`.
+
+## Creating a breakpoint GRanges object
+
+```{r input, warning=FALSE, message=FALSE}
+library(StructuralVariantAnnotation)
+vcf <- VariantAnnotation::readVcf(system.file("extdata", "gridss.vcf", package = "StructuralVariantAnnotation"))
+gr <- breakpointRanges(vcf)
+```
+
+`partner()` returns the breakpoint `GRanges` object with the order rearranged
+such that the partner breakend on the other side of each breakpoint
+corresponds with the local breakend.
+```{r}
+partner(gr)
+```
+
+Single breakends are loaded using the `breakendRanges()` function. The `GRanges` object is of the same form as `breakpointRanges()` but as the breakend partner is not specified, the partner is NA. A single GRanges object can contain both breakend and breakpoint variants.
+
+```{r}
+colo829_vcf <- VariantAnnotation::readVcf(system.file("extdata", "COLO829T.purple.sv.ann.vcf.gz", package = "StructuralVariantAnnotation"))
+colo829_bpgr <- breakpointRanges(colo829_vcf)
+colo829_begr <- breakendRanges(colo829_vcf)
+colo829_gr <- sort(c(colo829_begr, colo829_bpgr))
+colo829_gr[seqnames(colo829_gr) == "6"]
+```
+
+### Ensuring breakpoint consistency
+
+Functions such as `findBreakpointOverlaps()` require the `GRanges` object to be consistent.
+Subsetting a breakpoint `GRanges` object can result in one side of a breakpoint getting filtered with the remaining orphaned record no longer valid as its partner no longer exists.
+Such records need to be be filtered
+
+```{r}
+colo828_chr6_breakpoints <- colo829_gr[seqnames(colo829_gr) == "6"]
+# A call to findBreakpointOverlaps(colo828_chr6_breakpoints, colo828_chr6_breakpoints)
+# will fail as there are a) single breakends, and b) breakpoints with missing partners
+colo828_chr6_breakpoints <- colo828_chr6_breakpoints[hasPartner(colo828_chr6_breakpoints)]
+# As expected, each call on chr6 only overlaps with itself
+countBreakpointOverlaps(colo828_chr6_breakpoints, colo828_chr6_breakpoints)
+```
+
+Note that if you did want to include inter-chromosomal breakpoints involving chromosome 6, you would need to update the filtering criteria to include records with chr6 on either side. In such cases, the filtering logic can be simplified by the `selfPartnerSingleBreakends` parameter of `partner()`. When `selfPartnerSingleBreakends=TRUE`, the partner of single breakend events is considered to be the single breakend itself.
+
+```{r}
+colo828_chr6_breakpoints <- colo829_gr[
+  seqnames(colo829_gr) == "6" |
+    seqnames(partner(colo829_gr, selfPartnerSingleBreakends=TRUE)) == "6"]
+# this way we keep the chr3<->chr6 breakpoint and don't create any orphans
+head(colo828_chr6_breakpoints, 1)
+```
+
+### Breakpoint Overlaps
+
+`findBreakpointOverlaps()` and `countBreakpointOverlaps()` are functions for finding and counting overlaps between breakpoint objects.
+All breakends must have their partner breakend included in the GRanges.
+A valid overlap requires that breakends on boths sides overlap.
+
+To demonstrate the `countBreakpointOverlaps()` function, we use a small subset of data from our structural variant caller benchmarking paper to construct precision recall curves for a pair of callers.
+```{r}
+truth_vcf <- readVcf(system.file("extdata", "na12878_chr22_Sudmunt2015.vcf", package = "StructuralVariantAnnotation"))
+truth_svgr <- breakpointRanges(truth_vcf)
+truth_svgr <- truth_svgr[seqnames(truth_svgr) == "chr22"]
+crest_vcf <- readVcf(system.file("extdata", "na12878_chr22_crest.vcf", package = "StructuralVariantAnnotation"))
+# Some SV callers don't report QUAL so we need to use a proxy
+VariantAnnotation::fixed(crest_vcf)$QUAL <- info(crest_vcf)$left_softclipped_read_count + info(crest_vcf)$left_softclipped_read_count
+crest_svgr <- breakpointRanges(crest_vcf)
+crest_svgr$caller <- "crest"
+hydra_vcf <- readVcf(system.file("extdata", "na12878_chr22_hydra.vcf", package = "StructuralVariantAnnotation"))
+hydra_svgr <- breakpointRanges(hydra_vcf)
+hydra_svgr$caller <- "hydra"
+svgr <- c(crest_svgr, hydra_svgr)
+svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
+  # read pair based callers make imprecise calls.
+  # A margin around the call position is required when matching with the truth set
+  maxgap=100,
+  # Since we added a maxgap, we also need to restrict the mismatch between the
+  # size of the events. We don't want to match a 100bp deletion with a
+  # 5bp duplication. This will happen if we have a 100bp margin but don't also
+  # require an approximate size match as well
+  sizemargin=0.25,
+  # We also don't want to match a 20bp deletion with a 20bp deletion 80bp away
+  # by restricting the margin based on the size of the event, we can make sure
+  # that simple events actually do overlap
+  restrictMarginToSizeMultiple=0.5,
+  # HYDRA makes duplicate calls and will sometimes report a variant multiple
+  # times with slightly different bounds. countOnlyBest prevents these being
+  # double-counted as multiple true positives.
+  countOnlyBest=TRUE)
+```
+
+Once we know which calls match the truth set, we can generate Precision-Recall and ROC curves for each caller using one of the many ROC R packages, or directly with dplyr.
+
+```{r}
+suppressPackageStartupMessages(require(dplyr))
+suppressPackageStartupMessages(require(ggplot2))
+ggplot(as.data.frame(svgr) %>%
+  dplyr::select(QUAL, caller, truth_matches) %>%
+  dplyr::group_by(caller, QUAL) %>%
+  dplyr::summarise(
+    calls=dplyr::n(),
+    tp=sum(truth_matches > 0)) %>%
+  dplyr::group_by(caller) %>%
+  dplyr::arrange(dplyr::desc(QUAL)) %>%
+  dplyr::mutate(
+    cum_tp=cumsum(tp),
+    cum_n=cumsum(calls),
+    cum_fp=cum_n - cum_tp,
+    Precision=cum_tp / cum_n,
+    Recall=cum_tp/length(truth_svgr))) +
+  aes(x=Recall, y=Precision, colour=caller) +
+  geom_point() +
+  geom_line() +
+  labs(title="NA12878 chr22 CREST and HYDRA\nSudmunt 2015 truth set")
+```
+
+## Equivalent variants
+
+Converting to a breakpoint-centric notation does not fully resolve the problem of identical variants reported in different VCF notations.
+There are two additional commonly encountered notations that required additional handling, especially when comparing short and long read caller variant calls.
+
+### Insertion - Duplication equivalence
+
+Tandem duplications under 1,000bp are usually reported as insertion events by long read callers, but as duplication events by short read caller.
+These notations are equivalent but typical variant comparisons such as `findBreakpointOverlaps()` will not match these variants.
+The `findInsDupOverlaps()` function can be used to identify duplications and insertions that are equivalent.
+
+
+### Transitive breakpoints
+
+Transitive breakpoints are breakpoints that can be explained by multiple breakpoints.
+Identifying transitive breakpoints is important not only for matching short and long read call sets but also for the correct downstream interpretation of genomic rearrangements.
+Call sets that contain both transitive breakpoints and their constituent breakpoints are internally inconsistent which in turn causes incorrect downstream karyotype reconstructions.
+
+There are two type of transitive breakpoints:
+
+- Imprecise breakpoints that span one or more small DNA fragments.
+
+For example If DNA segments A, B, C are rearranged in an A-B-C configuration and the B segment is short, a short read caller may report an A-C breakpoints.
+This imprecise A-C breakpoint supported only by read pairs, can be explained by the precise A-B and B-C breakpoints.
+
+- Precise breakpoints with breakpoint inserted sequence
+
+These are similar in form to imprecise breakpoints in that a complex A-B-C rearrangement is reported as an A-C breakpoint.
+The different between imprecise and precise transitive breakpoints is that for precise breakpoints, the B segments is not missing, but is reported as inserted sequence between the breakpoints.
+This is a relatively common occurrence in long read call sets as long read aligners are unable to place short DNA segments due to the high indel error rate of long read calling.
+
+For example, NanoSV calling of Nanopore sequencing of the COLO829 cell line, results in multiple transitive SV calls:
+
+```{r}
+colo829_truth_bpgr  <- breakpointRanges(readVcf(system.file("extdata", "truthset_somaticSVs_COLO829.vcf", package = "StructuralVariantAnnotation")))
+colo829_nanosv_bpgr <- breakpointRanges(readVcf(system.file("extdata", "colo829_nanoSV_truth_overlap.vcf", package = "StructuralVariantAnnotation")), inferMissingBreakends=TRUE, ignoreUnknownSymbolicAlleles=TRUE)
+findTransitiveCalls(colo829_nanosv_bpgr, colo829_truth_bpgr)
+```
+
+Note that since `StructuralVariantAnnotation` treats both breakends equally, each transitive path will have two results.
+One for the path traversing from one breakend, another for the traversal in the opposite direction.
+
+## Converting between BEDPE, Pairs, and breakpoint GRanges
+
+The package supports converting GRanges objects to BEDPE files.
+The BEDPE format is defined by [`bedtools`](https://bedtools.readthedocs.io/en/latest/content/general-usage.html).
+This is achieved using `breakpointgr2pairs` and `pairs2breakpointgr` functions to convert to and from the GRanges `Pairs` notation used by `rtracklayer`.
+
+```{r}
+suppressPackageStartupMessages(require(rtracklayer))
+# Export to BEDPE
+rtracklayer::export(breakpointgr2pairs(gr), con="example.bedpe")
+
+# Import to BEDPE
+bedpe.gr  <- pairs2breakpointgr(rtracklayer::import("example.bedpe"))
+
+```
+
+## Visualising breakpoint pairs via circos plots
+
+One way of visualising paired breakpoints is by circos plots.
+
+Here, we use the plotting package `ggbio` which provides flexible track functions which bind with `ggplot2` objects.
+It takes `GRanges` objects as input and supports circos plots.
+To plot structural variant breakpoints in a circos plot using `ggbio`, we need to first prepare the breakpoint GRanges.
+The function requires a special column, indicating the end of the link using GRanges format.
+```{r add to.gr}
+suppressPackageStartupMessages(require(ggbio))
+gr.circos <- colo829_bpgr[seqnames(colo829_bpgr) %in% seqlevels(biovizBase::hg19sub)]
+seqlevels(gr.circos) <- seqlevels(biovizBase::hg19sub)
+mcols(gr.circos)$to.gr <- granges(partner(gr.circos))
+```
+We can then plot the breakpoints against reference genomes.
+```{r ggbio}
+p <- ggbio() +
+	circle(gr.circos, geom="link", linked.to="to.gr") +
+	circle(biovizBase::hg19sub, geom='ideo', fill='gray70') +
+	circle(biovizBase::hg19sub, geom='scale', size=2) +
+	circle(biovizBase::hg19sub, geom='text', aes(label=seqnames), vjust=0, size=3)
+p
+```
+
+## SessionInfo
+```{r}
+sessionInfo()
+```

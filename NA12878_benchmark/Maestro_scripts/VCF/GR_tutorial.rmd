@@ -1,0 +1,47 @@
+---
+title: "R practice"
+output: html_notebook
+---
+# ExRes VCF playground
+```{r}
+library(vcfR)
+library(GenomicRanges)
+```
+
+
+# vcfR
+```{r}
+NA.s.delly <- read.vcfR("NA12878_small.delly.vcf")
+```
+
+# GR
+
+To create a genomicsranges object, you need at minimum 3 things: chromosome, start and end
+
+```{r}
+NA.s.delly.gr <- GRanges(NA.s.delly@fix,
+              seqnames = CHROM, ## 1. CHR#
+              ranges=IRanges(start=START, end=END) ## 2. SV START & END
+              )
+```
+
+```{r}
+NA.s.delly.gr <- GRanges(seqnames = NA.s.delly$CHROM, ranges=IRanges(start=NA.s.delly$START, end=NA.s.delly$END))
+```
+
+
+you don't need ID, but useful to match samples up
+
+so when you load your vcfR object, the co-ordinates should be in the form:
+```{r}
+head(NA.s.delly@fix)
+```
+
+
+You can also query specific columns in the genotype information. Like: 
+
+```{r}
+extract.gt(NA.s.delly, element='END')
+```
+
+

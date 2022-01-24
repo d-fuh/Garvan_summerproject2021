@@ -28,11 +28,10 @@ ExRes$SV_chrom <- factor(ExRes$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", 
 ```{r message=FALSE}
 library(tidyverse)
 library(tidymodels)
-library(ggthemes)
+library(paletteer)
 library(ggforce)
 library(cowplot)
 library(egg)
-library(plotly)
 library(viridis)
 ```
 
@@ -49,12 +48,15 @@ table(ExRes$SV_chrom)
 
 ```{r}
 # there are duplicates so this isn't an accurate graph
-ExRes %>%
+ExRes %>% filter(Annotation_mode == "full") %>%
 
 ggplot(aes(x = SV_chrom, fill=Caller)) +
-    geom_bar() +
-    theme_bw() +
-    labs(x="Chromosome", y="Count") + scale_fill_brewer(palette = "Set2")
+  geom_bar() +
+  theme_bw() +
+  scale_fill_paletteer_d("nationalparkcolors::Badlands") +
+  labs(x="Chromosome", y="Count")  
+    
+cowplot::ggsave2("SV_count_caller_exres.png")
 ```
 
 
@@ -65,16 +67,19 @@ ggplot(aes(x = SV_chrom, fill=Caller)) +
 
 ```{r message=FALSE}
 # again, multiple callers can call the same variant, so include this as a warning in presentation.
-sample_size = ExRes %>% group_by(SV_type) %>% summarize(num=n())
+sample_size = ExRes %>% filter(Annotation_mode == "full") %>% group_by(SV_type) %>% summarize(num=n())
 
 ExRes %>%
+  filter(Annotation_mode == "full") %>%
   left_join(sample_size) %>%
   mutate(svtype = paste0(SV_type, "\n (n=", num, ")")) %>%
 
 ggplot(aes(x = svtype, fill=Caller)) +
-    geom_bar() + #scale_y_log10() +
-    theme_bw() + scale_fill_brewer(palette = "Set2") +
+    geom_bar() +
+    theme_bw() + scale_fill_paletteer_d("nationalparkcolors::Badlands") +
     labs(x="Type of SV", y="Count")
+
+cowplot::ggsave2("SV_type_caller_exres.png")
 
 rm("sample_size")
 ```
@@ -86,24 +91,27 @@ rm("sample_size")
 ### 3-1. SV length by caller
 
 ```{r}
-# similarly, duplicate calls is an issue
-ExRes %>% filter(!is.na(SV_length)) %>%
+# inaccurate graph?
+ExRes %>% filter(Annotation_mode == "split") %>%
+  filter(!is.na(SV_length)) %>%
   filter(SV_length != 0) %>%
   mutate(SV_length = abs(SV_length)) %>%
   
-  ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + geom_boxplot() + 
-  theme_bw() + scale_fill_brewer(palette = "Set2") +
-  scale_y_log10(breaks=c(10, 10^2, 10^3, 10^4, 10^5, 10^6, 10^7, 10^8), 
-                labels=c("10 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
-  
+  ggplot(aes(x=Caller, y=SV_length, fill=Caller)) + 
+  geom_boxplot() + 
+  scale_y_continuous(breaks = c(280, 5e7, 1e8, 1.5e8, 2e8), 
+                     labels = c("280 bp", "10 Mb", "100 Mb", "150 Mb", "2 Mb")) +
+  theme_bw() + scale_fill_paletteer_d("nationalparkcolors::Badlands") +
   ylab("SV size (log-scaled)") + xlab("")
+
+cowplot::ggsave2("SV_size_exres.png")
 ```
 
 
 ### 3-2. SV length vs SV type 
 
-```{r warning=FALSE, message=FALSE}
-line_plot <- ggplot(ExRes) + aes(x=abs(SV_length), color = SV_type) + 
+```{r}
+ggplot(ExRes) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
   theme_classic() + 
   paletteer::scale_colour_paletteer_d("khroma::bright", name = "SV type") +
@@ -114,16 +122,49 @@ line_plot <- ggplot(ExRes) + aes(x=abs(SV_length), color = SV_type) +
                 breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
                 label = c("10", "100", "1k", "10k", "100k"))
 
-ggplotly(line_plot)
-ggsave(line_plot, "line_plot_SV_type_ExRes.png")
-rm(line_plot)
+cowplot::ggsave2("line_plot_SV_type_ExRes.png")
+```
+
+
+```{r}
+# facet_wrap/ggarrange to partition SV subsets by major/minor type
+# subset 1. minor SV types (ALU, LINE1, SVA)
+ExRes %>% filter(SV_type %in% c("ALU", "LINE1", "SVA")) %>%
+  ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
+  geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
+  theme_classic() + 
+  paletteer::scale_colour_paletteer_d("lisa::FridaKahlo", name = "SV Type") +
+  scale_x_log10(name = "", 
+                breaks = c(1, 20, 1e2, 1e3, 1e4), 
+                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb")) +
+  scale_y_log10(name = "Counts (log-scaled)",
+                breaks= c(10, 10^2, 10^3, 10^4), 
+                label = c("10", "100", "1k", "10k")) -> p1
+
+# subset 2. major SV types (others)
+"%ni%" <- Negate("%in%")
+
+ExRes %>% filter(SV_type %ni% c("ALU", "LINE1", "SVA")) %>%
+  ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
+  geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
+  theme_classic() + 
+  paletteer::scale_colour_paletteer_d("khroma::bright", name = "SV Type") +
+  scale_x_log10(name = "SV size (log-scaled)", 
+                breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
+                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  scale_y_log10(name = "Counts (log-scaled)",
+                breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
+                label = c("10", "100", "1k", "10k", "100k")) -> p2
+
+egg::ggarrange(p1, p2, nrow = 2)
+ggsave2("two_line_plots_SV_type_exres.png")
 ```
 
 
 
 ## 4. Number of variants detected by all methods
 
-
+See Common_caller_test.R.
 
 
 
@@ -197,37 +238,6 @@ CDS <- filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'
 ```
 
 
-```{r}
-# these plots have scaling problems. WHY?
-sample_size = CDS %>% group_by(Location2) %>% summarize(num=n())
-
-CDS %>%
-  left_join(sample_size) %>%
-  mutate(topos = paste0(Location2, "\n (n=", num, ")")) %>%
-
-ggplot(aes(x = topos, fill=SV_type)) +
-    geom_bar() + scale_y_continuous(trans = "log1p", 
-                                    breaks = c(50, 1e3, 1e4, 1e5),
-                                    label = c("50", "1K", "10 K", "100 K")) +
-    theme_bw() +
-    labs(x="Gene topology", y="Count") + scale_fill_discrete(name = "SV type") 
-
-rm("sample_size")
-
-
-# w/ facet_wrap
-CDS %>%
-  ggplot(.) + aes(x = SV_type, fill=SV_type) + 
-  scale_y_continuous(trans = "log1p", 
-                     breaks = c(50, 1e3, 1e4, 1e5),
-                     label = c("50", "1K", "10 K", "100 K")) +
-    geom_bar() + 
-    facet_wrap( ~Location2) +
-    theme_bw() +
-    labs(x="Gene topology", y="Count") + scale_fill_discrete(name = "SV type")
-```
-
-
 To have a closer look on the variants affecting specifically only the CDS region, we subset:
 ```{r}
 sample_size = CDS %>% filter(Location2 == "CDS") %>% group_by(SV_type) %>% summarize(num=n())
@@ -276,7 +286,7 @@ ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select path
   #filter(Caller_count >= 3) %>% ## TODO confidence of call based on num of caller consensus
   filter(Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>% ## CDS-affecting
   #filter(Tissue == "which") %>% ## TODO specify tissue affected, if available (Gene_name could help?)
-
+  filter(abs(SV_length) <= 200000) %>% ## arbitrary limit to focus on important variants
 # selecting only variables we are interested in clinically
   subset(
     select=c("SV_chrom",	"SV_start",	"SV_end",	"SV_length",	"SV_type", ## basic SV info
@@ -289,13 +299,11 @@ ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select path
              "ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ", ## ExAC Z scores
              "GnomAD_pLI",	"ExAC_pLI" ## GnomAD/ExAC pLIs
                 )
-  ) -> elite_variants_exres
+  ) -> CDS_variants_exres
 
 # write to csv for further use
-#write.csv(elite_variants_exres, "elite_SV_ExRes.csv")
+write.csv(CDS_variants_exres, "200K_CDS_SV_ExRes.csv")
 ```
-
-
 
 
 
