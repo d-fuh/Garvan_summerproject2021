@@ -1,0 +1,17 @@
+We are interested in the variant calls affecting CDS regions. These include:
+```{r}
+filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>%
+  ggplot(aes(x = Location2, fill=SV_type)) +
+    geom_bar() +
+    theme_bw() +
+    labs(x="Gene topology", y="Count")
+```
+
+next: read up the manaual for fun variables
+
+***don't forget the major goal is to BENCHMARK the variants...lol***
+
+***next: curate the consensus list for NA (so hard)***
+
+*ExRes focus on the prioritised call set to find variants that are potentially interesting
+(but we don't have sufficient info on that)

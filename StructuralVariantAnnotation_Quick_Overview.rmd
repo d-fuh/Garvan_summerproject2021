@@ -3,15 +3,15 @@ title: "StructuralVariantAnnotation Quick Overview"
 author: "Ruining Dong, Daniel Cameron"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: yes
   html_document:
     toc: yes
     toc_float:
       collapsed: yes
       smooth_scroll: yes
-vignette: >
-  %\VignetteIndexEntry{Structural Variant Annotation Package}
-  %\VignetteEngine{knitr::rmarkdown}
-  %\VignetteEncoding{UTF-8}
+vignette: |
+  %\VignetteIndexEntry{Structural Variant Annotation Package} %\VignetteEngine{knitr::rmarkdown} %\VignetteEncoding{UTF-8}
 ---
 
 
@@ -21,10 +21,15 @@ knitr::opts_chunk$set(#echo = TRUE,
   comment = "#>")
 ```
 
+
 ## Introduction
+
 This vignette outlines parsing and annotation of structural variants from Variant Call Format (VCF) using the `StructuralVariantAnnotation` package.
 `StructuralVariantAnnotation` contains useful helper functions for reading, comparing, and interpreting structural variant calls.
 `StructuralVariantAnnotation` The package contains functions for parsing VCFs from a number of popular callers, dealing with breakpoints involving two separate genomic loci encoded as `GRanges` objects, as well as identifying various biological phenomena.
+
+
+
 
 ## Installation
 
@@ -36,6 +41,9 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 BiocManager::install("StructuralVariantAnnotation")
 library(StructuralVariantAnnotation)
 ```
+
+
+
 
 ## Representing structural variants in VCF
 
@@ -53,7 +61,7 @@ CGTGTtgtagtaCCGTAA  chr sequence
 chr	5	sequence	TTGTAGTA	T	.	.
 ```
 
-This is the format that most users will be familar with.
+This is the format that most users will be familiar with.
 It is the format used for small insertions and deletions.
 Unfortunately, it does not scale well to large events since both the `REF` and `ALT` sequences must be specified in full.
 For this reason, most structural variant callers will report events in a different notation.
