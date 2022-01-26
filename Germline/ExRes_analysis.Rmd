@@ -24,7 +24,6 @@ library(tidymodels)
 library(paletteer)
 library(ggforce)
 library(cowplot)
-library(egg)
 library(viridis)
 ```
 
@@ -54,7 +53,7 @@ table(ExRes$SV_chrom)
 
 ### 1-1. SV location by caller
 
-```{r}
+```{r Call count per chromosome by caller}
 # there are duplicates so this isn't an accurate graph
 ExRes %>% filter(Annotation_mode == "full") %>%
 
@@ -64,13 +63,13 @@ ggplot(aes(x = SV_chrom, fill=Caller)) +
   scale_fill_paletteer_d("nationalparkcolors::Badlands") +
   labs(x="Chromosome", y="Count")  
     
-cowplot::ggsave2("SV_count_chr_caller_exres.png")
+#ggsave2("SV_count_chr_caller_exres.png")
 ```
 (Superimpose line graph of chromosomal length on diaxis plot)
 
 ### 1-2. SV location by ExRes ID
 
-```{r}
+```{r Call count per chromosome by ExRes ID}
 # there are duplicates so this isn't an accurate graph
 # version A
 ExRes %>% filter(Annotation_mode == "full") %>%
@@ -82,7 +81,7 @@ ggplot(aes(x = SV_chrom, fill = ExResID)) +
   scale_fill_paletteer_d("calecopal::kelp1", name = "ExRes ID") +
   labs(x="Chromosome", y="Count")  
     
-cowplot::ggsave2("SV_count_dist_chr_ID_exres.png")
+#ggsave2("SV_count_dist_chr_ID_exres.png")
 ```
 
 
@@ -92,7 +91,7 @@ cowplot::ggsave2("SV_count_dist_chr_ID_exres.png")
 
 ### 2-1. SV type between callers
 
-```{r message=FALSE}
+```{r Call count per SV type by caller, message=FALSE}
 # again, multiple callers can call the same variant, so include this as a warning in presentation.
 sample_size = ExRes %>% filter(Annotation_mode == "full") %>% group_by(SV_type) %>% summarize(num=n())
 
@@ -106,7 +105,7 @@ ggplot(aes(x = svtype, fill=Caller)) +
     theme_bw() + scale_fill_paletteer_d("nationalparkcolors::Badlands") +
     labs(x="", y="Count")
 
-cowplot::ggsave2("SV_type_caller_exres.png")
+#ggsave2("SV_type_caller_exres.png")
 
 rm("sample_size")
 ```
@@ -117,7 +116,7 @@ rm("sample_size")
 
 ### 3-1. SV length by caller
 
-```{r}
+```{r SV size variation between callers}
 # inaccurate graph?
 ExRes %>% filter(Annotation_mode == "split") %>%
   filter(!is.na(SV_length)) %>%
@@ -131,30 +130,34 @@ ExRes %>% filter(Annotation_mode == "split") %>%
   theme_bw() + scale_fill_paletteer_d("nationalparkcolors::Badlands") +
   ylab("SV size (log-scaled)") + xlab("")
 
-cowplot::ggsave2("SV_size_exres.png")
+#ggsave2("SV_size_exres.png")
 ```
 
 
 ### 3-2. SV length vs SV type 
 
-```{r SV length in each type}
+```{r Call count across SV sizes coloured by variant category, dev='png', message=FALSE, warning=FALSE}
 ExRes %>% filter(Annotation_mode == "split") %>%
+  filter(!is.na(SV_length)) %>%
+  filter(SV_length != 0) %>%
+
   ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
-  geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
+  geom_line(aes(y=..count..), stat="bin", size = 1.05) +
   theme_classic() + 
   paletteer::scale_colour_paletteer_d("khroma::bright", name = "SV type") +
   scale_x_log10(name = "SV size (log-scaled)", 
                 breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
                 label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
-  scale_y_log10(name = "Counts (log-scaled)",
+  scale_y_continuous(trans = "log10", 
+                name = "Counts (log-scaled)",
                 breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
                 label = c("10", "100", "1k", "10k", "100k"))
 
-cowplot::ggsave2("line_plot_SV_type_ExRes.png")
+#ggsave2("line_plot_SV_type_ExRes.png")
 ```
 
 
-```{r SV length for two SV type categories, message=FALSE}
+```{r Call count across SV sizes for DEL/DUP/INS/INV and others (Melt), message=FALSE, warning=FALSE}
 # facet_wrap/ggarrange to partition SV subsets by major/minor type
 # subset 1. minor SV types (ALU, LINE1, SVA)
 ExRes %>% filter(Annotation_mode == "split") %>%
@@ -191,11 +194,11 @@ ExRes %>% filter(Annotation_mode == "split") %>%
                 label = c("10", "100", "1k", "10k", "100k")) -> p2
 
 p3 <- grid.arrange(p1, p2, nrow = 2)
-ggsave2("two_line_plots_SV_type_exres.png", p3)
+#ggsave2("two_line_plots_SV_type_exres.png", p3)
 ```
 
 
-```{r}
+```{r include=FALSE}
 rm(p1, p2, p3)
 ```
 
@@ -225,7 +228,7 @@ table(ExRes$ACMG_class)
 ```
 
 
-```{r message=FALSE}
+```{r echo=TRUE, message=FALSE, eval=FALSE}
 sample_size = ExRes %>% filter(Annotation_mode == "full") %>% group_by(ACMG_class) %>% summarize(num=n())
 
 ExRes %>%
@@ -244,7 +247,7 @@ rm("sample_size")
 
 Try removing ACMG = NA entries:
 
-```{r message=FALSE}
+```{r echo=TRUE, message=FALSE, eval=FALSE}
 filter(ExRes, !is.na(ACMG_class)) %>% filter(ACMG_class != "full=NA") %>%
 
 ggplot(aes(x = ACMG_class, fill=SV_type)) +
@@ -275,7 +278,7 @@ CDS <- filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'
 
 
 
-```{r}
+```{r Call count between SV types among Ex Res samples}
 sample_size = CDS %>% group_by(SV_type) %>% summarize(num=n())
 
 CDS %>%
@@ -289,7 +292,7 @@ CDS %>%
     scale_fill_paletteer_d("calecopal::kelp1", name = "Ex Res ID") +
     labs(x="", y="Count")
 
-cowplot::ggsave2("CDS_SV_type_ID_exres.png")
+#ggsave2("CDS_SV_type_ID_exres.png")
 
 rm(sample_size)
 ```
@@ -347,7 +350,7 @@ ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select path
 
 ### 6-3. Analysis on prioritised variants
 
-```{r tile exon count & frameshift}
+```{r tile Variant topology x Frameshift (Y/N) coloured by exon count}
 # exon count and frameshift profile
 CDS_variants_exres %>%
   ggplot() + aes(x=Location2, y=Frameshift, fill=sqrt(sqrt(sqrt(Exon_count)))) + geom_tile() +
@@ -355,10 +358,10 @@ CDS_variants_exres %>%
                           labels = paste(c(1, 5, 25, 100, 250))) +
   xlab("") + theme_bw()
 
-ggsave2("exon_count_frameshift_profile_exres.png")
+#ggsave2("exon_count_frameshift_profile_exres.png")
 ```
 
-```{r tile exon count & chromosomal location}
+```{r tile Chromosomal location x Variant topology coloured by exon count}
 # exon count and chromosome profile
 CDS_variants_exres %>%
   ggplot() + aes(x=SV_chrom, y=Location2, fill=sqrt(sqrt(sqrt(Exon_count)))) + geom_tile() +
@@ -367,11 +370,11 @@ CDS_variants_exres %>%
   xlab("") + ylab("") + 
   theme_bw() + theme(panel.grid.major = element_blank(), panel.background = element_rect(fill = "grey25"))
 
-ggsave2("exon_count_chr_profile_exres.png")
+#ggsave2("exon_count_chr_profile_exres.png")
 ```
 
 
-```{r tile Pathogenic variants sorted by Topology in ExRes genomes}
+```{r tile Variant pathogenicity (ACMG) overview across ExRes genomes x topology}
 # ACMG and chromosome profile: Curated set <pathogenic & CDS-affecting & has length < 200K>
 CDS_variants_exres %>%
   ggplot() + aes(x=SV_chrom, y=Location2, fill=ACMG_class) + geom_tile() +
@@ -409,7 +412,7 @@ CDS %>% filter(ACMG_class != "full=NA") %>%
   xlab("") + ylab("In Cytoband Order") +
   theme_bw() + theme(panel.grid.major = element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank())
 
-ggsave2("ACMG_profile_by_location_exres.png")
+#ggsave2("ACMG_profile_by_location_exres.png")
 ```
 
 
@@ -429,7 +432,7 @@ CDS %>% filter(ACMG_class != "full=NA") %>%
   theme_bw() + theme(panel.grid.major = element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank(),
                      panel.background = element_rect(fill = "grey45"))
 
-ggsave2("ACMG_profile_by_location_exres_dark.png")
+#ggsave2("ACMG_profile_by_location_exres_dark.png")
 ```
 
 
@@ -454,19 +457,8 @@ CDS_variants_exres %>%
                      axis.text.x=element_text(angle = 30)) + 
   scale_x_discrete(guide = guide_axis(n.dodge=2))
 
-ggsave2("variant_topology_by_exres_ID.png")
+#ggsave2("variant_topology_by_exres_ID.png")
 ```
-
-
-```{r Mode of Inheritance}
-# Mode of inheritance (moi)
-CDS_variants_exres %>%
-  ggplot() + aes(x=GenCC_moi) +
-  geom_histogram(stat="count")
-```
-
-
-
 
 
 
@@ -479,7 +471,7 @@ CDS_variants_exres %>%
 
 # II. Visualising high-dimensional data
 
-```{r Test plot: Two measures of pLI (GnomAD/ExAC), eval=FALSE}
+```{r Test plot: Two measures of pLI (GnomAD/ExAC), include=FALSE, eval=FALSE}
 # pLI: score indicating gene intolerance to a loss of function variation
 ExRes %>% filter(Annotation_mode == "split") %>% .[sample(nrow(.), 200000), ] %>%
   ggplot() + aes(x=GnomAD_pLI, y=ExAC_pLI, color=SV_chrom) + geom_point(size = 0.75) +
@@ -487,7 +479,7 @@ ExRes %>% filter(Annotation_mode == "split") %>% .[sample(nrow(.), 200000), ] %>
   scale_color_discrete(name = "Chromosome") + 
   theme(panel.background = element_rect(fill="grey12"))
 
-ggsave2("example_plot_exres_pli_scores.png")
+#ggsave2("example_plot_exres_pli_scores.png")
 ```
 
 
