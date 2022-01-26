@@ -54,7 +54,14 @@ gr <- GRanges(seqnames = as.character(NA.s.delly@fix[, 1]),
 ```
 
 
+## gr plays
+```{r}
+partner(gr)
+```
 
+```{r}
+gr.delly <- c(breakpointRanges(NA.s.delly), breakendRanges(NA.s.delly))
+```
 
 
 

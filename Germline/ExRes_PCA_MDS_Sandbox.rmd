@@ -3,94 +3,110 @@ title: "ExRes PCA/MDS sandbox"
 output: html_notebook
 ---
 
-### 7. nMDS-ExAC Z scores: A bundled measure of functional constraints per gene
-
-The ExAC Z scores (read more at where?) are:
-
-> ExAC_delZ,	ExAC_dupZ,	ExAC_cnvZ,	ExAC_synZ,	ExAC_misZ
-
-
-Since they are Z scores ... they should approximately follow known distribution (SND)...right?
-
-
-#### Workflow
-
---> Extract all ExAC data into numeric mtx
-```{r}
-# selecting a subset of SV size < 20 kb 
-# as we are evaluating whether ExAC Z scores together are a good representation/estimate of 
-# "functional constraint" corresponding to a gene-variant pair. We are hence omitting larger variants
-# that likely span multiple genes.
-
-# Also, vegan::metaMDS doesn't seem tolerate huge data frames well.
-
-elite_variants_exres %>%
-  subset(select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ")) -> Z.mtx
-```
-
---> Already standardised
-
---> Filter out NA, beware of zeros
-```{r}
-Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes all rows containing any NA
-
-round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ
-```
-
-```{r}
-# Subsample to avoid overtime issue
-Z.mtx[sample(nrow(Z.mtx), 400), ] -> Z.mtx.sample
-```
-
---> Run MDS compression
-```{r}
-MDS.S <- vegan::metaMDS(Z.mtx.sample, distance = "euclidean", autotransform = FALSE, trace = FALSE)
+# Packages
+```{r message = FALSE}
+library(vegan)
+library(paletteer)
+library(tidyverse)
 ```
 
 
---> Check stress level of MDS
+
+# MDS
+
+## ExAC Z scores: A bundled measure of functional constraints per gene
+
+> Explain why there is an ExAC Z score for certain variants and not for certain others.
+
+> Explain what the Z score means for a reported variant than spans multiple genes/CDS.
+
+
+
+
+### Workflow
+
+- i. Extract ExAC Z scores from a variant subset (CDS-affectors below) to a numeric matrix
+```{r}
+# extract Z data from CDS-affecting variants
+CDS %>%
+  subset(select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ", 
+                  "ID", "ExResID",
+                  "Caller", "SV_type", "SV_length",
+                  "Gene_count", "Exon_count")) -> Z.mtx
+```
+
+
+- ii. Consider standardisation: In this case, Z scores were already mass-standardised
+
+- iii. NA filtration 
+```{r}
+Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes any rows containing NA in any of the five variables
+
+round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ ## somehow this one is float
+```
+
+- iv. Subsampling (n= 4000)
+```{r}
+# NB: MDS seems to be unable to handle big data
+# also: MDS is not as visually effective when you have overcrowded data points (e.g. n > 4,000)
+# so the choice of subsample size is a matter of power vs visual effectiveness 
+
+Z.mtx[sample(nrow(Z.mtx), 400), ] -> Z.mtx.sample  ## included ID
+
+# Prove/Disprove: Scale this sample size (n) by a factor k scales the cardinality of resultant distance matrix by k^p
+# where p is the number of variables (here = 5)
+```
+
+
+- v. Apply distance (= dissimilarity) measure on variable matrix (Z.mtx)
+
+-- v-1. Choice of distance measure?
+-- v-2. Prior transform necessary?
+
+```{r}
+Z.mtx.sample[ , -which(names(Z.mtx.sample) %in% c("ID","ExResID", "Caller", "SV_type", "SV_length", "Gene_count", "Exon_count"))] %>%
+    vegan::metaMDS(., distance = "euclidean", autotransform = TRUE, trace = 1) -> MDS.S
+```
+
+
+- vi. Check stress level of MDS plot
 ```{r}
 MDS.S$stress ## Checking MDS stress for interpretation
 MDS.S$stress <= 0.20
 ```
 
+> Recall the standard MDS stress cap = 0.20.
 
-Recall the standard level of acceptance of MDS stress = 0.20.
 
-
---> Obtain Cartesian coordinate in S_mtx
+- vii. Map the MDS object to Cartesian coordinate system 
 ```{r}
-MDS.xy <- data.frame(MDS.S$points) ## Sending the cartesian coordinates in MDS profile to MDS.xy
+MDS.xy <- data.frame(MDS.S$points) ## Sending the NMDS coordinates to new df
 ```
 
 
---> Send coordinate to new dummy df + assign factors of interest (e.g. Caller)
+- viii. Assign variables of interest (e.g. ExResID, Caller) to CRS object (Previous step)
 
-#### Assigning factors: Great code
+#### Assigning variables
 ```{r}
-# precious codes
-MDS.xy$Caller = elite_variants_exres[match(row.names(MDS.xy), row.names(elite_variants_exres)),"Caller"]
-names(MDS.xy)[names(MDS.xy) == 'Caller.Caller'] <- 'Caller'
+# matching by rownames
+# NB: the only instance where the rownames will be consistent
+# is where the df originated also from subsampling downstream. i.e. only use Z.mtx.sample and nothing upstream
+# as the row name will not coincide.
 
-MDS.xy$GnomAD_pLI = elite_variants_exres[match(row.names(MDS.xy), row.names(elite_variants_exres)),"GnomAD_pLI"]
-names(MDS.xy)[names(MDS.xy) == 'GnomAD_pLI.GnomAD_pLI'] <- 'GnomAD_pLI'
-MDS.xy$ExAC_pLI = elite_variants_exres[match(row.names(MDS.xy), row.names(elite_variants_exres)),"ExAC_pLI"]
-names(MDS.xy)[names(MDS.xy) == 'ExAC_pLI.ExAC_pLI'] <- 'ExAC_pLI'
+# this would only work if the MDS distance compression (MDS.S) retained the original sample order (in Z.mtx.sample)
 
-MDS.xy$SV_type = elite_variants_exres[match(row.names(MDS.xy), row.names(elite_variants_exres)),"SV_type"]
-names(MDS.xy)[names(MDS.xy) == 'SV_type.SV_type'] <- 'SV_type'
+MDS.xy$Caller = Z.mtx.sample[match(row.names(MDS.xy), row.names(Z.mtx.sample)),"Caller"]
+MDS.xy$ExResID = Z.mtx.sample[match(row.names(MDS.xy), row.names(Z.mtx.sample)),"ExResID"]
 
-MDS.xy$SV_length = elite_variants_exres[match(row.names(MDS.xy), row.names(elite_variants_exres)),"SV_length"]
-names(MDS.xy)[names(MDS.xy) == 'SV_length.SV_length'] <- 'SV_length'
-
-MDS.xy$SV_chrom = elite_variants_exres[match(row.names(MDS.xy), row.names(elite_variants_exres)),"SV_chrom"]
-names(MDS.xy)[names(MDS.xy) == 'SV_chrom.SV_chrom'] <- 'SV_chrom'
+# ggplot issue with columns as "lists" (somehow)
+MDS.xy$Caller <- unlist(MDS.xy$Caller)
+MDS.xy$ExResID <- unlist(MDS.xy$ExResID)
 ```
 
 
---> Run MDS plot and annotate with factor levels 
+- ix. Produce MDS plots and annotate with variable levels 
 
-#### 7-1. ExACZ ~ Caller
+#### 1. ExACZ ~ Caller
 ```{r}
 # MDS: (1) By Caller
 ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
@@ -109,7 +125,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
 
 
 
-#### 7-2. ExACZ ~ ACMG class
+#### 2. ExACZ ~ ACMG class
 ```{r}
 # MDS: (2) By ACMG class of SV
 MDS.xy$ACMG_class <- as.factor(MDS.xy$ACMG_class) ## coerce as factor level (discrete) instead of numeric (continuous)
@@ -132,7 +148,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() 
 ```
 
 
-#### 7-3. ExACZ ~ SV type
+#### 3. ExACZ ~ SV type
 ```{r}
 # MDS: (3) By SV type
 ggplot(MDS.xy, aes(MDS1, MDS2, color = SV_type)) + geom_point(size = 1) +
@@ -173,14 +189,14 @@ MDS.xy %>% filter(SV_type != "SVA") %>%
 
 
 
-#### 7-4. ExACZ ~ SV length
+#### 4. ExACZ ~ SV length
 ```{r}
 # MDS: (4) By SV length
 MDS.xy %>% filter(!is.na(SV_length)) %>% mutate(SV_length = log10(abs(SV_length))) %>%
 
 ggplot(aes(MDS1, MDS2, color = SV_length)) + geom_point(size = 1) +
   
-  scale_color_viridis(option = "A") +
+  scale_color_viridis(option = "A", discrete = FALSE) +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
@@ -194,7 +210,7 @@ ggplot(aes(MDS1, MDS2, color = SV_length)) + geom_point(size = 1) +
 ```
 
 
-#### 7-5. ExACZ ~ variant location
+#### 5. ExACZ ~ variant location
 ```{r}
 # MDS: (5) By variant location
 ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
@@ -213,9 +229,36 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
 ```
 
 
-### 8. PCA:
+#### 6. ExACZ ~ ExResID
+```{r}
+MDS.xy %>%
+  ggplot() + aes(MDS1, MDS2, color=ExResID) + geom_point(size = 1) +
+  
+  theme(axis.title = element_blank(),
+        #panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
+        #panel.grid.major = element_line(color = "grey30", size=0.1),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.title = element_text(size = 12),
+        legend.key = element_rect(fill = NA)) +
+  
+  scale_color_paletteer_d("calecopal::kelp1", name = "Ex Res ID") +
+  
+  guides(color = guide_legend(override.aes = list(size = 4.5)))
+```
 
-#### 8-1. ExAC_Z continued: ACMG score and ExAC Z measure of functional constraint
+
+
+
+
+
+
+
+
+
+# PCA
+
+## 1. ExAC_Z continued: ACMG score and ExAC Z measure of functional constraint
 ```{r}
 # using entire data frame instead of subsample as in MDS restrictions
 Z.pca <- princomp(Z.mtx)
@@ -229,9 +272,8 @@ summary(Z.pca) ## important statistics of each PC, mostly %var accounted
 loadings(Z.pca) ## "loadings" in PCA refers to the linear (de)composition of each PC
 ```
 
-Select PC1,2 = ~ 80%; PC1,2,3 = ~ 91% (Quite low!)
 
-#### 2D PCA (80%)
+
 ```{r}
 # PCA plot: 2D
 Z.coor <- data.frame(Z.pca$scores)
@@ -262,9 +304,9 @@ ggplot(Z.coor) + aes(Comp.1, Comp.2, color=ACMG_class) + geom_point() +
 ```
 
 
-Consider subsample to n=600:
+Consider subsampling to n=600:
 
-#### Subsampling: n=600
+### Subsampling: n=600
 ```{r}
 # sample down to n=600
 Z.coor[sample(nrow(Z.coor), 600), ] -> Z.pca.sample
