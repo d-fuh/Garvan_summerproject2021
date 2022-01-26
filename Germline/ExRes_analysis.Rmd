@@ -15,6 +15,24 @@ output:
   pdf_document:
     toc: yes
 ---
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(
+                 fig.path   = 'figure/'
+               #, cache.path = 'cache/'
+               #, cache      = FALSE
+               , dev        = 'png'
+               , fig.align  = 'center'
+               , fig.show   = 'hold'
+               #, fig.width  = 8
+               #, fig.height = 6
+               #, out.width  = '.8\\linewidth'
+               , par        = TRUE
+               , echo       = FALSE
+               , warning    = FALSE
+               , message    = FALSE
+               )
+```
+
 
 # Packages
 
