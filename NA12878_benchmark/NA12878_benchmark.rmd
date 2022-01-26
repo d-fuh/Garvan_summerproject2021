@@ -1,19 +1,40 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Benchmarking Structural Variant Callers using NA12878 WGS reference"
+author: 
+  David Fuh, <br/>
+  Summer Intern, <br/>
+  Garvan Institute of Medical Research, 
+  Kinghorn Centre for Clinical Genomics, 
+  Sydney, NSW, Australia
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
 ---
 
-This is a continuation of the benchmarking process on SV callers of NA12878 data. 
+# Packages
+```{r}
+library(tidyverse)
+library(ggforce)
+library(paletteer)
+library(GenomicRanges)
+library(vcfR)
+library(ggbio)
+library(StructuralVariantAnnotation)
+```
 
-In this notebook, we benchmark the callers against a known variant call set, instead of each other (for that, see NA12878_maestro).
+# Obtaining the truth set of NA12878 SV calls
+
+```{r}
+truth_vcf <- readVcf(system.file("extdata", "na12878_chr22_Sudmunt2015.vcf", package = "StructuralVariantAnnotation"))
+truth_svgr <- breakpointRanges(truth_vcf)
+truth_svgr <- truth_svgr[seqnames(truth_svgr) == "chr22"]
+crest_vcf <- readVcf(system.file("extdata", "na12878_chr22_crest.vcf", package = "StructuralVariantAnnotation"))
+```
 
 
-# Section II. [w/ reference] Caller set {Delly, Manta, SvABA, Wham, Melt} against Gold Standard (NA12878 truth set)
-
-## 1. [ONGOING] Precision, Recall, and FPR
-
-### Definition of terms
-
-    - Precision = 1 - false discovery rate = 1 - FPR
-    
-    - Recall = 

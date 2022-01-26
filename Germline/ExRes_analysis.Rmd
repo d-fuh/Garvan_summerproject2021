@@ -1,16 +1,24 @@
 ---
-title: "Benchmarking Structural Variant Callers from ExRes cohort data"
+title: "Structural Variant Analysis on the Exceptional Responders Cohort"
 author: 
   David Fuh, <br/>
   Summer Intern, <br/>
   Garvan Institute of Medical Research, 
   Kinghorn Centre for Clinical Genomics
-output: html_notebook
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  pdf_document:
+    toc: yes
 ---
 
 # Packages
 
-```{r message=FALSE}
+```{r Loading packages, message=FALSE}
 library(tidyverse)
 library(tidymodels)
 library(paletteer)
@@ -22,7 +30,7 @@ library(viridis)
 
 
 # Data import
-```{r}
+```{r Data import}
 ExRes <- read_csv("ExRes.csv")
 
 # Clean up useless columns
@@ -40,7 +48,7 @@ ExRes$SV_chrom <- factor(ExRes$SV_chrom, levels=c("1", "2", "3", "4", "5", "6", 
 
 ## 1. SV call location
 
-```{r}
+```{r Overview of variant location}
 table(ExRes$SV_chrom)
 ```
 
@@ -129,7 +137,7 @@ cowplot::ggsave2("SV_size_exres.png")
 
 ### 3-2. SV length vs SV type 
 
-```{r}
+```{r SV length in each type}
 ExRes %>% filter(Annotation_mode == "split") %>%
   ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
@@ -146,18 +154,20 @@ cowplot::ggsave2("line_plot_SV_type_ExRes.png")
 ```
 
 
-```{r}
+```{r SV length for two SV type categories, message=FALSE}
 # facet_wrap/ggarrange to partition SV subsets by major/minor type
 # subset 1. minor SV types (ALU, LINE1, SVA)
 ExRes %>% filter(Annotation_mode == "split") %>%
   filter(SV_type %in% c("ALU", "LINE1", "SVA")) %>%
   ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
+  # alternatively, for closed-ended plot, use
+  # geom_freqpoly(size = 1.05) +
   theme_classic() + 
   paletteer::scale_colour_paletteer_d("lisa::FridaKahlo", name = "SV Type") +
   scale_x_log10(name = "", 
-                breaks = c(1, 20, 1e2, 1e3, 1e4), 
-                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb")) +
+                breaks = c(1, 2, 20, 1e2, 1e3, 1e4), 
+                label = c("1 bp", "2 bp","20 bp", "100 bp", "1 kb", "10 kb")) +
   scale_y_log10(name = "Counts (log-scaled)",
                 breaks= c(10, 10^2, 10^3, 10^4), 
                 label = c("10", "100", "1k", "10k")) -> p1
@@ -169,17 +179,24 @@ ExRes %>% filter(Annotation_mode == "split") %>%
   filter(SV_type %ni% c("ALU", "LINE1", "SVA")) %>%
   ggplot(.) + aes(x=abs(SV_length), color = SV_type) + 
   geom_line(aes(fill=..count..), stat="bin", size = 1.05) +
+  # alternatively, for closed-ended plot, use
+  # geom_freqpoly(size = 1.05) +
   theme_classic() + 
   paletteer::scale_colour_paletteer_d("khroma::bright", name = "SV Type") +
   scale_x_log10(name = "SV size (log-scaled)", 
-                breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
-                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+                breaks = c(1, 2, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
+                label = c("1 bp", "\n 2 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
   scale_y_log10(name = "Counts (log-scaled)",
                 breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
                 label = c("10", "100", "1k", "10k", "100k")) -> p2
 
 p3 <- grid.arrange(p1, p2, nrow = 2)
 ggsave2("two_line_plots_SV_type_exres.png", p3)
+```
+
+
+```{r}
+rm(p1, p2, p3)
 ```
 
 
@@ -203,7 +220,7 @@ See Common_caller_test.R.
 
 ## 5. ACMG class of variants (essentially unpresentable as many caveats)
 
-```{r}
+```{r Overview of ACMG class distribution in ExRes data}
 table(ExRes$ACMG_class)
 ```
 
@@ -243,7 +260,7 @@ ggplot(aes(x = ACMG_class, fill=SV_type)) +
 
 ### 6-1. CDS-affecting SVs
 
-```{r}
+```{r Overview of variant topology in ExRes data}
 table(ExRes$Location2)
 ```
 
@@ -251,7 +268,7 @@ Note that only split AM contains topology data (confirmed).
 
 
 ### SV curation set: CDS-affecting only
-```{r}
+```{r Generate dataframe CDS}
 # subset of AM=split data frame containing CDS-affecting entries --- AnnotSV-called
 CDS <- filter(ExRes, Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR"))
 ```
@@ -303,7 +320,7 @@ rm(sample_size)
 
 
 ### List curation
-```{r}
+```{r Generate CDS_variants_exres}
 ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select pathogenic variants 
   #filter(Caller_count >= 3) %>% ## TODO confidence of call based on num of caller consensus
   filter(Location2 %in% c("5'UTR-3'UTR", "5'UTR-CDS", "CDS", "CDS-3'UTR")) %>% ## CDS-affecting
@@ -330,7 +347,7 @@ ExRes %>% filter(ACMG_class %in% c(4, 5, "full=4", "full=5")) %>% ## select path
 
 ### 6-3. Analysis on prioritised variants
 
-```{r}
+```{r tile exon count & frameshift}
 # exon count and frameshift profile
 CDS_variants_exres %>%
   ggplot() + aes(x=Location2, y=Frameshift, fill=sqrt(sqrt(sqrt(Exon_count)))) + geom_tile() +
@@ -341,7 +358,7 @@ CDS_variants_exres %>%
 ggsave2("exon_count_frameshift_profile_exres.png")
 ```
 
-```{r}
+```{r tile exon count & chromosomal location}
 # exon count and chromosome profile
 CDS_variants_exres %>%
   ggplot() + aes(x=SV_chrom, y=Location2, fill=sqrt(sqrt(sqrt(Exon_count)))) + geom_tile() +
@@ -354,7 +371,7 @@ ggsave2("exon_count_chr_profile_exres.png")
 ```
 
 
-```{r}
+```{r tile Pathogenic variants sorted by Topology in ExRes genomes}
 # ACMG and chromosome profile: Curated set <pathogenic & CDS-affecting & has length < 200K>
 CDS_variants_exres %>%
   ggplot() + aes(x=SV_chrom, y=Location2, fill=ACMG_class) + geom_tile() +
@@ -380,7 +397,10 @@ CDS_variants_exres %>%
   theme_bw() + theme(panel.grid.major = element_blank(),
                      axis.text.y=element_text(angle = 10, hjust = 0)) +
   scale_y_discrete(guide = guide_axis(n.dodge=2))
+```
 
+
+```{r eval = FALSE}
 # With all CDS-affecting variants...
 CDS %>% filter(ACMG_class != "full=NA") %>%
   ggplot() + aes(x=SV_chrom, y=reorder(CytoBand, desc(CytoBand)), fill=ACMG_class) + 
@@ -392,13 +412,20 @@ CDS %>% filter(ACMG_class != "full=NA") %>%
 ggsave2("ACMG_profile_by_location_exres.png")
 ```
 
-```{r}
+
+> How to correctly interpret this plot?
+
+
+```{r tile Pathogenic variants sorted by Cytoband in ExRes genomes}
 # alternative version (darker background)
 CDS %>% filter(ACMG_class != "full=NA") %>%
   ggplot() + aes(x=SV_chrom, y=reorder(CytoBand, desc(CytoBand)), fill=ACMG_class) + 
-  geom_tile(aes(alpha = Gene_count)) +
+  
+  ## change to dplyr:: "Count the number of ACMG_class of this type in this cytoband
+  geom_tile(aes(alpha = Gene_count)) + 
+  
   scale_fill_viridis_d(name = "ACMG class", labels = paste(c("1", "3", "4", "5"))) +
-  xlab("") + ylab("In Cytoband Order") +
+  xlab("") + ylab("In cytoband order") +
   theme_bw() + theme(panel.grid.major = element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank(),
                      panel.background = element_rect(fill = "grey45"))
 
@@ -406,7 +433,7 @@ ggsave2("ACMG_profile_by_location_exres_dark.png")
 ```
 
 
-```{r}
+```{r ACMG across ExRes genomes}
 # ACMG class across genome among patients
 CDS %>% filter(ACMG_class != "full=NA") %>%
   ggplot() + aes(x=SV_chrom, y=ExResID, fill=ACMG_class) + 
@@ -417,7 +444,7 @@ CDS %>% filter(ACMG_class != "full=NA") %>%
 ```
 
 
-```{r}
+```{r Variant topology among ExRes}
 # Distribution of detected variant topology across each patient's genome
 CDS_variants_exres %>% 
   ggplot() + aes(x=SV_chrom, fill=Location2) + 
@@ -431,9 +458,11 @@ ggsave2("variant_topology_by_exres_ID.png")
 ```
 
 
-```{r}
+```{r Mode of Inheritance}
 # Mode of inheritance (moi)
-
+CDS_variants_exres %>%
+  ggplot() + aes(x=GenCC_moi) +
+  geom_histogram(stat="count")
 ```
 
 
@@ -450,7 +479,7 @@ ggsave2("variant_topology_by_exres_ID.png")
 
 # II. Visualising high-dimensional data
 
-```{r}
+```{r Test plot: Two measures of pLI (GnomAD/ExAC), eval=FALSE}
 # pLI: score indicating gene intolerance to a loss of function variation
 ExRes %>% filter(Annotation_mode == "split") %>% .[sample(nrow(.), 200000), ] %>%
   ggplot() + aes(x=GnomAD_pLI, y=ExAC_pLI, color=SV_chrom) + geom_point(size = 0.75) +
@@ -470,7 +499,7 @@ ggsave2("example_plot_exres_pli_scores.png")
 
 ## Create a smaller subset of the master file
 
-```{r}
+```{r eval=FALSE}
 # AM=full across whole SVs
 profile.full <- subset(benchmark.full, 
        
@@ -496,4 +525,8 @@ profile.split <- subset(benchmark.split,
 
 # Footnotes
 
+# Session Info
+```{r}
+sessionInfo()
+```
 

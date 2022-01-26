@@ -32,7 +32,7 @@ CDS %>%
   subset(select=c("ExAC_delZ",	"ExAC_dupZ",	"ExAC_cnvZ",	"ExAC_synZ",	"ExAC_misZ", 
                   "ID", "ExResID",
                   "Caller", "SV_type", "SV_length",
-                  "Gene_count", "Exon_count")) -> Z.mtx
+                  "Location2", "Frameshift")) -> Z.mtx
 ```
 
 
@@ -45,13 +45,13 @@ Z.mtx[complete.cases(Z.mtx), ] -> Z.mtx ## removes any rows containing NA in any
 round(Z.mtx$ExAC_cnvZ, 9) -> Z.mtx$ExAC_cnvZ ## somehow this one is float
 ```
 
-- iv. Subsampling (n= 4000)
+- iv. Subsampling (n= 800)
 ```{r}
 # NB: MDS seems to be unable to handle big data
 # also: MDS is not as visually effective when you have overcrowded data points (e.g. n > 4,000)
 # so the choice of subsample size is a matter of power vs visual effectiveness 
 
-Z.mtx[sample(nrow(Z.mtx), 400), ] -> Z.mtx.sample  ## included ID
+Z.mtx[sample(nrow(Z.mtx), 800), ] -> Z.mtx.sample  ## included ID
 
 # Prove/Disprove: Scale this sample size (n) by a factor k scales the cardinality of resultant distance matrix by k^p
 # where p is the number of variables (here = 5)
@@ -64,7 +64,7 @@ Z.mtx[sample(nrow(Z.mtx), 400), ] -> Z.mtx.sample  ## included ID
 -- v-2. Prior transform necessary?
 
 ```{r}
-Z.mtx.sample[ , -which(names(Z.mtx.sample) %in% c("ID","ExResID", "Caller", "SV_type", "SV_length", "Gene_count", "Exon_count"))] %>%
+Z.mtx.sample[ , -which(names(Z.mtx.sample) %in% c("ID","ExResID", "Caller", "SV_type", "SV_length", "Location2", "Frameshift"))] %>%
     vegan::metaMDS(., distance = "euclidean", autotransform = TRUE, trace = 1) -> MDS.S
 ```
 
@@ -97,10 +97,16 @@ MDS.xy <- data.frame(MDS.S$points) ## Sending the NMDS coordinates to new df
 
 MDS.xy$Caller = Z.mtx.sample[match(row.names(MDS.xy), row.names(Z.mtx.sample)),"Caller"]
 MDS.xy$ExResID = Z.mtx.sample[match(row.names(MDS.xy), row.names(Z.mtx.sample)),"ExResID"]
+MDS.xy$SV_length = Z.mtx.sample[match(row.names(MDS.xy), row.names(Z.mtx.sample)),"SV_length"]
+MDS.xy$Location2 = Z.mtx.sample[match(row.names(MDS.xy), row.names(Z.mtx.sample)),"Location2"]
+MDS.xy$Frameshift = Z.mtx.sample[match(row.names(MDS.xy), row.names(Z.mtx.sample)),"Frameshift"]
 
 # ggplot issue with columns as "lists" (somehow)
 MDS.xy$Caller <- unlist(MDS.xy$Caller)
 MDS.xy$ExResID <- unlist(MDS.xy$ExResID)
+MDS.xy$SV_length <- unlist(MDS.xy$SV_length)
+MDS.xy$Location2 <- unlist(MDS.xy$Location2)
+MDS.xy$Frameshift <- unlist(MDS.xy$Frameshift)
 ```
 
 
@@ -125,14 +131,14 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color = Caller)) + geom_point(size = 1) +
 
 
 
-#### 2. ExACZ ~ ACMG class
+#### 2. ExACZ ~ Frameshift
 ```{r}
 # MDS: (2) By ACMG class of SV
-MDS.xy$ACMG_class <- as.factor(MDS.xy$ACMG_class) ## coerce as factor level (discrete) instead of numeric (continuous)
+#MDS.xy$ACMG_class <- as.factor(MDS.xy$ACMG_class) ## coerce as factor level (discrete) instead of numeric (continuous)
 
-ggplot(MDS.xy, aes(MDS1, MDS2, color = ACMG_class)) + geom_point() + theme_bw() +
+ggplot(MDS.xy, aes(MDS1, MDS2, color = Frameshift)) + geom_point() + theme_bw() +
   
-  scale_colour_viridis(discrete = TRUE, name = "ACMG class") +
+  scale_colour_viridis(discrete = TRUE, name = "Frameshift") +
   
     theme(legend.key = element_rect(fill = NA),
         legend.text = element_text(size = 11),
@@ -210,10 +216,10 @@ ggplot(aes(MDS1, MDS2, color = SV_length)) + geom_point(size = 1) +
 ```
 
 
-#### 5. ExACZ ~ variant location
+#### 5. ExACZ ~ variant topology
 ```{r}
 # MDS: (5) By variant location
-ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
+ggplot(MDS.xy, aes(MDS1, MDS2, color=Location2)) + geom_point(size = 1) +
   
   theme(axis.title = element_blank(),
         panel.background = element_rect(fill = "grey12", colour = "black", size = 1),
@@ -223,7 +229,7 @@ ggplot(MDS.xy, aes(MDS1, MDS2, color=SV_chrom)) + geom_point(size = 1) +
         legend.title = element_text(size = 12),
         legend.key = element_rect(fill = NA)) +
   
-  scale_color_discrete(name = "Chromosome") +
+  scale_color_discrete(name = "Variant topology") +
   
   guides(color = guide_legend(override.aes = list(size = 4.5)))
 ```
