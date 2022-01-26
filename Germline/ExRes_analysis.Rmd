@@ -20,7 +20,6 @@ output:
 
 ```{r Loading packages, message=FALSE}
 library(tidyverse)
-library(tidymodels)
 library(paletteer)
 library(ggforce)
 library(cowplot)
@@ -193,7 +192,7 @@ ExRes %>% filter(Annotation_mode == "split") %>%
                 breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
                 label = c("10", "100", "1k", "10k", "100k")) -> p2
 
-p3 <- grid.arrange(p1, p2, nrow = 2)
+p3 <- gridExtra::grid.arrange(p1, p2, nrow = 2)
 #ggsave2("two_line_plots_SV_type_exres.png", p3)
 ```
 
