@@ -1,0 +1,111 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+library(tidyverse)
+library(GenomicRanges)
+library(vcfR)
+```
+
+
+1. Using NA12878 small, create GRanges for Delly, Manta, Svaba
+
+```{r}
+# read in vcf
+delly <- read.vcfR("NA12878_small.delly.vcf")
+manta <- read.vcfR("NA12878_small.manta.vcf")
+svaba <- read.vcfR("NA12878_small.svaba.vcf")
+```
+
+```{r}
+# create GR
+gr.delly <- GRanges(seqnames = as.character(delly@fix[, 1]),
+              ranges=IRanges(start=as.numeric(delly@fix[, 2]), 
+                             end=as.numeric(extract.info(delly, element='END'))), 
+              ID=as.character(delly@fix[, 3]))
+```
+
+
+```{r}
+# extract endpoints for manta/svaba
+manta.matchstart=regexpr("[0-9]{3,}", manta@fix[, 2])
+manta.start=regmatches(manta@fix[, 2], manta.matchstart)
+manta.matchend=regexpr("[0-9]{3,}", manta@fix[, 5])
+manta.end=regmatches(manta@fix[, 5], manta.matchend)
+
+svaba.match=regexpr("[0-9]{3,}", svaba@fix[, 5])
+svaba.start=regmatches(svaba@fix[, 2], svaba.match)
+svaba.end=regmatches(svaba@fix[, 5], svaba.match)
+
+# chr to num
+manta.end <- as.numeric(manta.end)
+manta.start <- as.numeric(manta.start)
+svaba.end <- as.numeric(svaba.end)
+svaba.start <- as.numeric(svaba.start)
+
+# create gr
+gr.manta <- GRanges(seqnames = as.character(manta@fix[, 1]),
+              ranges=IRanges(start=as.numeric(manta@fix[, 2]), 
+                             end=as.numeric(manta.end)), 
+              ID=as.character(manta@fix[, 3]))
+
+gr.svaba <- GRanges(seqnames = as.character(svaba@fix[, 1]),
+              ranges=IRanges(start=svaba.start, 
+                             end=svaba.end), 
+              ID=as.character(svaba@fix[, 3]))
+```
+
+```{r}
+# sample test
+TestTerm=c("A]chr20:29376355]", "CT[chr1:108952231[", "]chr3:110694547]TT")
+chrMatch=regexpr("chr[0-9|XY]*", TestTerm)
+chrPlace=regmatches(TestTerm, chrMatch)
+
+#TestTerm=manta@fix[, 5]
+manta.match=regexpr("[0-9]{3,}", manta@fix[, 5])
+manta.end=regmatches(manta@fix[, 5], manta.match)
+
+chrPlace
+```
+
+
+```{r}
+head(manta.end)
+```
+```{r}
+svaba.match=regexpr("[0-9]{3,}", svaba@fix[, 5])
+svaba.end=regmatches(svaba@fix[, 5], svaba.match)
+```
+
+```{r}
+manta.end <- as.numeric(manta.end)
+svaba.end <- as.numeric(svaba.end)
+```
+
+```{r}
+#delly[,1] == regexpr("[0-9]{3,}", delly@fix[, 5])
+#as.list(manta@fix[,1]) == as.list(manta.match)
+manta[,1]
+manta.match
+```
+
+```{r}
+library(StructuralVariantAnnotation
+        )
+delly_vcf <- readVcf("NA12878_small.delly.vcf")
+delly_svgr <- breakpointRanges(delly_vcf)
+
+manta_vcf <- readVcf("NA12878_small.manta.vcf")
+manta_svgr <- breakpointRanges(manta_vcf)
+
+#svaba_vcf <- readVcf("NA12878_small.svaba.vcf")
+#svaba_svgr <- breakpointRanges(svaba_vcf)
+
+melt_vcf <- readVcf("NA12878_small.melt.vcf")
+melt_svgr <- breakpointRanges(melt_vcf)
+
+wham_vcf <- readVcf("NA12878_small.wham.vcf")
+wham_svgr <- breakpointRanges(wham_vcf)
+```
+

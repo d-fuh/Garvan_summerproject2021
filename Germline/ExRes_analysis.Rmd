@@ -1,10 +1,10 @@
 ---
 title: "Structural Variant Analysis on the Exceptional Responders Cohort"
 author: 
-  David Fuh, <br/>
-  Summer Intern, <br/>
-  Garvan Institute of Medical Research, 
-  Kinghorn Centre for Clinical Genomics
+  #David Fuh, <br/>
+  #Summer Intern, <br/>
+  #Garvan Institute of Medical Research, 
+  #Kinghorn Centre for Clinical Genomics
 date: "`r Sys.Date()`"
 output:
   pdf_document:
@@ -27,7 +27,7 @@ knitr::opts_chunk$set(
                #, fig.height = 6
                #, out.width  = '.8\\linewidth'
                , par        = TRUE
-               , echo       = FALSE
+               , echo       = TRUE ## toggle
                , warning    = FALSE
                , message    = FALSE
                )
