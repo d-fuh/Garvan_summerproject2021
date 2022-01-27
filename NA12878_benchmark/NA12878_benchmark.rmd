@@ -36,7 +36,7 @@ knitr::opts_chunk$set(
 
 
 # Packages
-```{r}
+```{r Packages}
 library(tidyverse)
 library(paletteer)
 library(GenomicRanges)
@@ -50,7 +50,7 @@ library(StructuralVariantAnnotation)
 - Personalis_deletions_hg38.bed
 - Spiral_Genetics_insertions_hg38.bed
 
-```{r}
+```{r READ IN Truth SV set NA12878}
 setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
 
 personalis <- read.table("Personalis_deletions_hg38.bed")
@@ -72,7 +72,7 @@ spiral <- read.table("Spiral_Genetics_insertions_hg38.bed")
 # Benchmarking the big 4: "Delly, Manta, Melt, Wham"
 
 ## BreakpointRanges
-```{r}
+```{r caller_svgr generation}
 setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
 
 delly_vcf <- readVcf("NA12878.delly.vcf")
@@ -92,13 +92,13 @@ wham_svgr <- breakpointRanges(wham_vcf)
 ```
 
 ## partner
-```{r}
+```{r partner}
 partner(delly_svgr)
 partner(delly_svgr, selfPartnerSingleBreakends = TRUE)
 ```
 
 ## Ensuring breakpoint consistency
-```{r}
+```{r countBreakpointOverlaps}
 NAS_delly_chr6_breakpoints <- delly_svgr[seqnames(delly_svgr) == "chr6"]
 # A call to findBreakpointOverlaps(colo828_chr6_breakpoints, colo828_chr6_breakpoints)
 # will fail as there are a) single breakends, and b) breakpoints with missing partners
@@ -116,7 +116,7 @@ countBreakpointOverlaps(NAS_chr6_breakpoints, NAS_chr6_breakpoints)
 
 
 ## Benchmarking: Recall
-```{r}
+```{r Assigning callers to svgr}
 # assign caller info
 delly_svgr$Caller <- "Delly"
 manta_svgr$Caller <- "Manta"
@@ -142,9 +142,10 @@ truth_svgr <- GenomicRanges::GRanges(
 ```
 
 
-```{r}
+```{r svgr and truth_matches}
 # countBreakpointOverlaps
 svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr)
+
 svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
   # read pair based callers make imprecise calls.
   # A margin around the call position is required when matching with the truth set
@@ -164,7 +165,7 @@ svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
   countOnlyBest=TRUE)
 ```
 
-```{r}
+```{r Precision-Recall plot}
 # plot
 ggplot(as.data.frame(svgr) %>%
   dplyr::select(QUAL, Caller, truth_matches) %>%
@@ -184,7 +185,7 @@ ggplot(as.data.frame(svgr) %>%
   geom_point() +
   geom_line() +
   theme_bw() +
-  labs(title="NA12878 small subset Delly/Manta/Melt/Wham vs Personalis")
+  labs(title="NA12878 Delly/Manta/Melt/Wham vs Personalis")
 ```
 
 ## Visualising breakpoint pairs via circos plots

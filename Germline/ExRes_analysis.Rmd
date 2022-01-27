@@ -7,13 +7,13 @@ author:
   #Kinghorn Centre for Clinical Genomics
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
-    toc: yes
   html_document:
     toc: yes
     toc_float:
       collapsed: yes
       smooth_scroll: yes
+  pdf_document:
+    toc: yes
 ---
 ```{r setup, include=FALSE, cache=FALSE}
 knitr::opts_chunk$set(
@@ -238,7 +238,7 @@ See Common_caller_test.R.
 
 
 
-## 5. ACMG class of variants (essentially unpresentable as many caveats)
+## 5. ACMG class of variants
 
 ```{r Overview of ACMG class distribution in ExRes data}
 table(ExRes$ACMG_class)
@@ -313,8 +313,8 @@ CDS %>%
 
 rm(sample_size)
 ```
-(run multi ANOVA: In each SV type, which patient has the most sig. deviation? Star it.)
 
+(Potentially: Run multi ANOVA, for each SV type, star whichever patient has the most sig. deviation from the group.)
 
 
 ### 6-2. Prioritised variant list
@@ -323,20 +323,15 @@ rm(sample_size)
 
     Raw call set %>% filter(PASS) %>% filter(ACMG = {4,5}) %>% 
     
-    [R scripts]       [R scripts]           [Task 4]
-    
 <2nd layer>    
 
           filter(Called by e.g. at least 3 callers out of 5 used) %>% 
-          [Task 3]
           
           
           filter(CDS-affecting) %>% 
-          [Task 5]
           
           
           filter(Known to affect XX tissue)
-          [This task]
 
 
 ### List curation
@@ -485,23 +480,8 @@ CDS_variants_exres %>%
 
 
 
-
-
-
-
-
 # II. Visualising high-dimensional data
 
-```{r Test plot: Two measures of pLI (GnomAD/ExAC), include=FALSE, eval=FALSE}
-# pLI: score indicating gene intolerance to a loss of function variation
-ExRes %>% filter(Annotation_mode == "split") %>% .[sample(nrow(.), 200000), ] %>%
-  ggplot() + aes(x=GnomAD_pLI, y=ExAC_pLI, color=SV_chrom) + geom_point(size = 0.75) +
-  theme_classic() +
-  scale_color_discrete(name = "Chromosome") + 
-  theme(panel.background = element_rect(fill="grey12"))
-
-#ggsave2("example_plot_exres_pli_scores.png")
-```
 
 
 
