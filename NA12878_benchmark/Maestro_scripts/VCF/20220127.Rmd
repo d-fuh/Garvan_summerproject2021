@@ -91,8 +91,8 @@ manta.match
 ```
 
 ```{r}
-library(StructuralVariantAnnotation
-        )
+library(StructuralVariantAnnotation)
+
 delly_vcf <- readVcf("NA12878_small.delly.vcf")
 delly_svgr <- breakpointRanges(delly_vcf)
 
