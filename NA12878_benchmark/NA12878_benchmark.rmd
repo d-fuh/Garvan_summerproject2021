@@ -57,15 +57,12 @@ personalis <- read.table("Personalis_deletions_hg38.bed")
 spiral <- read.table("Spiral_Genetics_insertions_hg38.bed")
 ```
 
-```{r}
-# join? don't join?
 
+## VCF file (Papenfuss Lab)
+```{r}
+truth_vcf <- readVcf("NA12878_truth.vcf")
 ```
 
-```{r}
-# renaming cols
-
-```
 
 
 
@@ -141,6 +138,11 @@ truth_svgr <- GenomicRanges::GRanges(
   )
 ```
 
+```{r svgr of truth set of NA12878}
+# Papenfuss Lab
+truth_svgr <- breakpointRanges(truth_vcf)
+```
+
 
 ```{r svgr and truth_matches}
 # countBreakpointOverlaps
@@ -162,7 +164,8 @@ svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
   # HYDRA makes duplicate calls and will sometimes report a variant multiple
   # times with slightly different bounds. countOnlyBest prevents these being
   # double-counted as multiple true positives.
-  countOnlyBest=TRUE)
+  countOnlyBest=TRUE
+  )
 ```
 
 ```{r Precision-Recall plot}
@@ -185,7 +188,7 @@ ggplot(as.data.frame(svgr) %>%
   geom_point() +
   geom_line() +
   theme_bw() +
-  labs(title="NA12878 Delly/Manta/Melt/Wham vs Personalis")
+  labs(title="NA12878 Delly/Manta/Melt/Wham calls vs Truth Set \n from the Papenfuss Lab")
 ```
 
 ## Visualising breakpoint pairs via circos plots
@@ -197,7 +200,7 @@ Here, we use the plotting package ggbio which provides flexible track functions 
 ```{r circos}
 suppressPackageStartupMessages(require(ggbio))
 
-gr.circos <- delly_svgr[seqnames(delly_svgr) %in% seqlevels(biovizBase::hg19sub)]
+gr.circos <- svgr[seqnames(svgr) %in% seqlevels(biovizBase::hg19sub)]
 
 seqlevels(gr.circos) <- seqlevels(biovizBase::hg19sub)
 
