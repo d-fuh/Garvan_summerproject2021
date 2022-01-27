@@ -7,13 +7,13 @@ author:
   Kinghorn Centre for Clinical Genomics
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: yes
   html_document:
     toc: yes
     toc_float:
       collapsed: yes
       smooth_scroll: yes
-  pdf_document:
-    toc: yes
 ---
 ```{r setup, include=FALSE, cache=FALSE}
 knitr::opts_chunk$set(
