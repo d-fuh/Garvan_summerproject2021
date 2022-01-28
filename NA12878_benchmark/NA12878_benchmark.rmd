@@ -112,7 +112,7 @@ small_svaba_svgr <- breakpointRanges(small_svaba_vcf)
 ```
 
 ## svgr filter
-```{r}
+```{r svgr filter and dimensions}
 # want Caller@elementMetadata$FILTER == "PASS" only
 delly_svgr=subset(delly_svgr, delly_svgr@elementMetadata[, 5] == "PASS") ## 7816/39070
 manta_svgr=subset(manta_svgr, manta_svgr@elementMetadata[, 5] == "PASS") ## 12080/14174 (SampleFT, MinQUAL, ...)
@@ -243,7 +243,8 @@ aes(x=Recall, y=Precision, colour=Caller) +
   theme_bw() +
   labs(title="Delly/Manta/Melt/Wham/SvABA SV calls vs Truth Set \n (NA12878; Personalis & Spiral)")
 ```
-```{r SUBSETS}
+
+```{r svgr med_svgr small_svgr generation}
 svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
 med_svgr <- c(med_delly_svgr, med_manta_svgr, med_melt_svgr, med_wham_svgr, med_svaba_svgr)
 small_svgr <- c(small_delly_svgr, small_manta_svgr, small_melt_svgr, small_wham_svgr, small_svaba_svgr)
@@ -261,44 +262,6 @@ small_svgr$truth_matches <- countBreakpointOverlaps(small_svgr, truth_svgr,
                                                     restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
 
 ALL_svgr <- c(svgr, med_svgr, small_svgr)
-
-ggplot(as.data.frame(ALL_svgr) %>%
-         
-         dplyr::select(Caller, Cov, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
-  
-         dplyr::group_by(Caller, Cov) %>%
-  
-    dplyr::summarise(
-    
-      calls=dplyr::n(), ## number of calls for each caller that matches the truth
-    
-      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
-  
-    dplyr::group_by(Caller, Cov) %>%
-  
-    #dplyr::arrange(dplyr::desc(QUAL)) %>% ## QUAL doesn't work in our workflow, leave it
-  
-    dplyr::mutate(
-    
-      cum_tp=cumsum(tp),
-    
-      cum_n=cumsum(calls),
-    
-      cum_fp=cum_n - cum_tp,
-    
-      Precision=cum_tp / cum_n,
-    
-      Recall=cum_tp/length(truth_svgr)
-      )
-  ) +
-  
-aes(x=Recall, y=Precision, colour=Caller) +
-
-  geom_point(size=2.5) +
-  geom_line() +
-  theme_bw() +
-  facet_wrap(~Cov) +
-  labs(title="Precision X Recall plot for five SV callers vs Truth Set \n (NA12878; Personalis & Spiral; 3 coverage levels)")
 ```
 
 ```{r USE precision recall plot <ORIGINAL>}
@@ -389,23 +352,27 @@ ggplot() +
 
 ```{r USE precision recall plot <SUBSET BAR>}
 # indiv. version
-
 # plot
-# idea: group the big four into one so we can color by group / facet_wrap
-
-## overall recall?
+## count of breakpoint overlap (0, 1, 2) in each NA12878 sample vs the truth set 
 L1 <- ggplot(as.data.frame(svgr)) +
   aes(x=truth_matches, fill=Caller) +
-  geom_bar(position = "dodge") + ggtitle("Large") + ylab("") + theme(legend.position = "none")
+  geom_bar(position = "dodge") + 
+  ggtitle("Large (~35X)") + ylab("Count") + xlab("") +
+  theme_classic() + theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
 
 M1 <- ggplot(as.data.frame(med_svgr)) +
   aes(x=truth_matches, fill=Caller) +
-  geom_bar(position = "dodge") + ggtitle("Medium") + ylab("") + theme(legend.position = "none")
+  geom_bar(position = "dodge") + 
+  ggtitle("Medium (~6X)") + ylab("") + xlab("n(Breakpoint overlap)") +
+  theme_classic() + theme(legend.position = "none", plot.title = element_text(hjust = 0.5))
 
 S1 <- ggplot(as.data.frame(small_svgr)) +
   aes(x=truth_matches, fill=Caller) +
-  geom_bar(position = "dodge") + ggtitle("Small") + 
-  theme(legend.position = c(.95, .95),
+  geom_bar(position = "dodge") + 
+  ggtitle("Small (~1X)") + ylab("") + xlab("") + 
+  theme_classic() +
+  theme(plot.title = element_text(hjust = 0.5),
+    legend.position = c(.95, .95),
     legend.justification = c("right", "top"),
     legend.box.just = "right",
     legend.margin = margin(6, 6, 6, 6))
@@ -621,52 +588,105 @@ ggplot(test) +
 
 
 
-## Using findBreakpointOverlaps() to find matching calls between callers
+## CONSENSUS SCREENING: Using countBreakpointOverlaps() to find matching calls between callers
 
-There are two methods for detecting matching calls between different callers:
+countBreakpointOverlaps(Caller1_svgr, Caller2_svgr) compares the SV calls between two callers based on a given set of criteria for breakpoint resolution between two approximate calls, and returns a vector of (0...1...) 's for every call position. In which,
+0 = FALSE (no match) and 1 = TRUE (matches).
 
-- 1. findBreakpointOverlaps()
-- 2. findInsDupOverlaps()
+We can exploit this function to find which calls were consistent between any two, or more, callers, of the five callers we are benchmarking.
 
-Tandem duplications under 1,000bp are usually reported as insertion events by long read callers, but as duplication events by short read caller. These notations are equivalent but typical variant comparisons such as **findBreakpointOverlaps**() will not match these variants. The **findInsDupOverlaps**() function can be used to identify duplications and insertions that are equivalent.
+We will start as an example with the full-sized file from NA12878.
 
 
 ```{r test}
 # test: match delly/wham calls
 # both callers call from relatively large SVs to small SVs
 
-findBreakpointOverlaps(delly_svgr, manta_svgr)
+head(countBreakpointOverlaps(delly_svgr, manta_svgr), 100)
 ```
 
 What to do with the resultant object?
+
 ```{r test}
-dellyXmanta <- findBreakpointOverlaps(delly_svgr, manta_svgr, 
-                                      maxgap=100, sizemargin=0.5)
+delly_svgr$mantamatch <- countBreakpointOverlaps(delly_svgr, manta_svgr, 
+                                                 sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
 
-head(dellyXmanta@from) ##
-head(dellyXmanta@to)
-
-test <- data.frame(dellyXmanta@from, 
-                   dellyXmanta@to)
-
-head(delly_svgr@ranges)
+dXm <- delly_svgr[delly_svgr$mantamatch==1] ## reads: "of those calls who matches with manta, subset to this df
 ```
 
-```{r Six pairwise comparison}
-# C(4,2) = 6 comparisons
-dellyXmanta <- findBreakpointOverlaps(delly_svgr, manta_svgr)
-dellyXmelt <- findBreakpointOverlaps(delly_svgr, melt_svgr)
-dellyXwham <- findBreakpointOverlaps(delly_svgr, wham_svgr)
+The resultant subset (a GR) can be used for many purposes.
 
-mantaXmelt <- findBreakpointOverlaps(manta_svgr, melt_svgr)
-mantaXwham <- findBreakpointOverlaps(manta_svgr, wham_svgr)
 
-meltXwham <- findBreakpointOverlaps(melt_svgr, wham_svgr)
+```{r Ten pairwise comparisons}
+# we will use consistent criteria for breakpoint resolution as before
+
+# we will do all 10 pair-wise comparisons together
+# C(5,2) = 10 comparisons
+# each svgr stores comparison with other callers
+
+# first, we use wham (n=12788, largest of five) as the standard
+delly_svgr$whammatch <- countBreakpointOverlaps(delly_svgr, wham_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+manta_svgr$whammatch <- countBreakpointOverlaps(manta_svgr, wham_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+melt_svgr$whammatch <- countBreakpointOverlaps(melt_svgr, wham_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+svaba_svgr$whammatch <- countBreakpointOverlaps(svaba_svgr, wham_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# compare to manta (n=12080)
+delly_svgr$mantamatch <- countBreakpointOverlaps(delly_svgr, manta_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+wham_svgr$mantamatch <- countBreakpointOverlaps(wham_svgr, manta_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+melt_svgr$mantamatch <- countBreakpointOverlaps(melt_svgr, manta_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+svaba_svgr$mantamatch <- countBreakpointOverlaps(svaba_svgr, manta_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# to delly (n=7816)
+wham_svgr$dellymatch <- countBreakpointOverlaps(wham_svgr, delly_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+manta_svgr$dellymatch <- countBreakpointOverlaps(manta_svgr, delly_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+melt_svgr$dellymatch <- countBreakpointOverlaps(melt_svgr, delly_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+svaba_svgr$dellymatch <- countBreakpointOverlaps(svaba_svgr, delly_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# to svaba (n=5804)
+delly_svgr$svabamatch <- countBreakpointOverlaps(delly_svgr, svaba_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+manta_svgr$svabamatch <- countBreakpointOverlaps(manta_svgr, svaba_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+melt_svgr$svabamatch <- countBreakpointOverlaps(melt_svgr, svaba_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+wham_svgr$svabamatch <- countBreakpointOverlaps(wham_svgr, svaba_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# to melt (n=2006)
+delly_svgr$meltmatch <- countBreakpointOverlaps(delly_svgr, melt_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+manta_svgr$meltmatch <- countBreakpointOverlaps(manta_svgr, melt_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+wham_svgr$meltmatch <- countBreakpointOverlaps(wham_svgr, melt_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+svaba_svgr$meltmatch <- countBreakpointOverlaps(svaba_svgr, melt_svgr, 
+                                       sizemargin=0.25, restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
 ```
 
 
+```{r Consensus list}
+# consensus list: comparisons of comparisons
+# start largest, then small
+whamMantaDelly=wham_svgr[wham_svgr$mantamatch==1 & wham_svgr$dellymatch==1] ## n=1420
+
+whamMantaDellySvaba=whamMantaDelly[whamMantaDelly$svabamatch==1] ## n=1070
+
+consensus=whamMantaDellySvaba[whamMantaDellySvaba$meltmatch==1] ## n=0 (!)
+## does order matter here? why?
+```
 
 
+```{r Annotate with caller number}
+
+```
 
 
 
