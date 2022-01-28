@@ -50,7 +50,7 @@ library(StructuralVariantAnnotation)
 - Personalis_deletions_hg38.bed
 - Spiral_Genetics_insertions_hg38.bed
 
-```{r READ IN Truth SV set NA12878}
+```{r eval=FALSE}
 setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
 
 personalis <- read.table("Personalis_deletions_hg38.bed")
@@ -59,10 +59,20 @@ spiral <- read.table("Spiral_Genetics_insertions_hg38.bed")
 
 
 ## VCF file (Papenfuss Lab)
-```{r}
-truth_vcf <- readVcf("NA12878_truth.vcf")
+```{r eval=FALSE}
+truth_vcf <- readVcf("NA12878_truth.vcf", "hg38")
 ```
 
+
+## VCF file (hg38, Personalis & Spiral)
+```{r READ IN Truth SV set NA12878}
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+
+personalis_vcf <- readVcf("test_personalis_hg38.vcf")
+spiral_vcf <- readVcf("test_spiral_hg38.vcf")
+
+truth_vcf <- rbind(personalis_vcf, spiral_vcf)
+```
 
 
 
@@ -72,30 +82,41 @@ truth_vcf <- readVcf("NA12878_truth.vcf")
 ```{r caller_svgr generation}
 setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
 
-delly_vcf <- readVcf("NA12878.delly.vcf")
+delly_vcf <- readVcf("NA12878.delly.vcf", "hg38")
 delly_svgr <- breakpointRanges(delly_vcf)
 
-manta_vcf <- readVcf("NA12878.manta.vcf")
+manta_vcf <- readVcf("NA12878.manta.vcf", "hg38")
 manta_svgr <- breakpointRanges(manta_vcf)
 
-melt_vcf <- readVcf("NA12878.melt.vcf")
+melt_vcf <- readVcf("NA12878.melt.vcf", "hg38")
 melt_svgr <- breakpointRanges(melt_vcf)
 
-wham_vcf <- readVcf("NA12878.wham.vcf")
+wham_vcf <- readVcf("NA12878.wham.vcf", "hg38")
 wham_svgr <- breakpointRanges(wham_vcf)
 
 #svaba_vcf <- readVcf("NA12878_small.svaba.vcf")
 #svaba_svgr <- breakpointRanges(svaba_vcf)
 ```
 
+## svgr filter
+```{r}
+# want Caller@elementMetadata$FILTER == "PASS" only
+delly_svgr=subset(delly_svgr, delly_svgr@elementMetadata[, 5] == "PASS") ## 7816/39070
+manta_svgr=subset(manta_svgr, manta_svgr@elementMetadata[, 5] == "PASS") ## 12080/14174 (SampleFT, MinQUAL, ...)
+melt_svgr=subset(melt_svgr, melt_svgr@elementMetadata[, 5] == "PASS") ## 2006/3782 (looks mostly lowQUAL)
+wham_svgr=subset(wham_svgr, wham_svgr@elementMetadata[, 5] == "PASS") ## 12788/12788 (looks ALL PASS)
+```
+
+
+
 ## partner
-```{r partner}
+```{r partner ignore, eval=FALSE}
 partner(delly_svgr)
 partner(delly_svgr, selfPartnerSingleBreakends = TRUE)
 ```
 
 ## Ensuring breakpoint consistency
-```{r countBreakpointOverlaps}
+```{r countBreakpointOverlaps ignore, eval=FALSE}
 NAS_delly_chr6_breakpoints <- delly_svgr[seqnames(delly_svgr) == "chr6"]
 # A call to findBreakpointOverlaps(colo828_chr6_breakpoints, colo828_chr6_breakpoints)
 # will fail as there are a) single breakends, and b) breakpoints with missing partners
@@ -121,16 +142,15 @@ melt_svgr$Caller <- "Melt"
 wham_svgr$Caller <- "Wham"
 ```
 
-```{r}
+## truth_svgr
+```{r BED version, eval=FALSE}
 # truth svgr
 # 1. Personalis
 truth_svgr <- GenomicRanges::GRanges(
   seqnames = personalis$V1, 
   ranges=IRanges(start=personalis$V2, end=personalis$V3)
   )
-```
 
-```{r}
 # 2. Spiral
 truth_svgr <- GenomicRanges::GRanges(
   seqnames = spiral$V1, 
@@ -138,17 +158,24 @@ truth_svgr <- GenomicRanges::GRanges(
   )
 ```
 
-```{r svgr of truth set of NA12878}
+```{r Papenfuss version (hg19), eval=FALSE}
 # Papenfuss Lab
 truth_svgr <- breakpointRanges(truth_vcf)
 ```
 
+```{r Personalis & Spiral VCF}
+truth_svgr <- breakpointRanges(truth_vcf)
+```
 
-```{r svgr and truth_matches}
+
+
+```{r svgr and truth_matches, eval=FALSE}
 # countBreakpointOverlaps
+# Papenfuss used the vector version
+# we will test the individual version later
 svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr)
 
-svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
+svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr, ## note vectorised comparison
   # read pair based callers make imprecise calls.
   # A margin around the call position is required when matching with the truth set
   maxgap=100,
@@ -168,8 +195,9 @@ svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
   )
 ```
 
-```{r Precision-Recall plot}
+```{r Precision-Recall plot, eval=FALSE}
 # plot
+# need to understand what each term/param means...
 ggplot(as.data.frame(svgr) %>%
   dplyr::select(QUAL, Caller, truth_matches) %>%
   dplyr::group_by(Caller, QUAL) %>%
@@ -183,7 +211,7 @@ ggplot(as.data.frame(svgr) %>%
     cum_n=cumsum(calls),
     cum_fp=cum_n - cum_tp,
     Precision=cum_tp / cum_n,
-    Recall=cum_tp/length(wham_svgr))) +
+    Recall=cum_tp/length(truth_svgr))) +
   aes(x=Recall, y=Precision, colour=Caller) +
   geom_point() +
   geom_line() +
@@ -191,28 +219,269 @@ ggplot(as.data.frame(svgr) %>%
   labs(title="NA12878 Delly/Manta/Melt/Wham calls vs Truth Set \n from the Papenfuss Lab")
 ```
 
+```{r truth_matches for each caller}
+# Delineate each term
+svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr)
+
+# delly: RP + SR
+# manta: RP + SR + LA
+# melt: 
+# wham: 
+
+svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr, 
+                                              
+                                              maxgap=200, sizemargin=0.25, ## explain
+                                              
+                                              restrictMarginToSizeMultiple=0.5, ## explain
+                                              
+                                              countOnlyBest=TRUE) ## do any of the callers (tend to) make duplicate calls?
+
+# plot
+# need to understand what each term/param means...
+ggplot(as.data.frame(svgr) %>%
+         dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
+  dplyr::group_by(Caller) %>%
+  
+    dplyr::summarise(
+    
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+    
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
+  
+    dplyr::group_by(Caller) %>%
+  
+    #dplyr::arrange(dplyr::desc(QUAL)) %>% ## QUAL doesn't work in our workflow, leave it
+  
+    dplyr::mutate(
+    
+      cum_tp=cumsum(tp),
+    
+      cum_n=cumsum(calls),
+    
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+    
+      Recall=cum_tp/length(truth_svgr)
+      )
+  ) +
+  
+aes(x=Recall, y=Precision, colour=Caller) +
+
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  labs(title="NA12878 Delly/Manta/Melt/Wham calls vs Truth Set \n (Personalis & Spiral)")
+```
+
+```{r}
+# indiv. version
+
+# delly: RP + SR
+# manta: RP + SR + LA
+# melt: 
+# wham: 
+
+# fine-tune each param for each caller later
+delly_svgr$truth_matches <- countBreakpointOverlaps(delly_svgr, 
+                                              truth_svgr, 
+                                              maxgap=100, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+manta_svgr$truth_matches <- countBreakpointOverlaps(manta_svgr, 
+                                              truth_svgr, 
+                                              maxgap=100, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+melt_svgr$truth_matches <- countBreakpointOverlaps(melt_svgr, 
+                                             truth_svgr, 
+                                             maxgap=50, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+wham_svgr$truth_matches <- countBreakpointOverlaps(wham_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# plot
+# instead of using Papenfuss' Precision-Recall plot,
+# let's understand the data (Caller$caller_matches) and work from there
+
+# caller_matches is a single vector that has 0 == "no match with truth" or 1 == "matched with truth" for
+# each SV call. So it retained *which* calls matched to the truth set 
+# accroding to our parameters (double-check those params too)
+
+# idea: group the big four into one so we can color by group / facet_wrap
+
+svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr)
+
+# plot again
+## overall recall?
+ggplot(as.data.frame(svgr)) +
+  aes(x=truth_matches, fill=Caller) +
+  geom_bar(position = "dodge")
+
+## recall rate
+ggplot(as.data.frame(svgr) %>%
+         
+         dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
+  
+         dplyr::group_by(Caller) %>%
+  
+    dplyr::summarise(
+    
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+    
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
+  
+    dplyr::group_by(Caller) %>%
+  
+    dplyr::mutate(
+    
+      cum_tp=cumsum(tp),
+    
+      cum_n=cumsum(calls),
+    
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+    
+      Recall=cum_tp/length(truth_svgr)
+      )
+  ) +
+  
+aes(x=Caller, y=Recall, fill=Caller) + geom_delaunay_segment(position="dodge")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Using findBreakpointOverlaps() to find matching calls between callers
+
+There are two methods for detecting matching calls between different callers:
+
+- 1. findBreakpointOverlaps()
+- 2. findInsDupOverlaps()
+
+Tandem duplications under 1,000bp are usually reported as insertion events by long read callers, but as duplication events by short read caller. These notations are equivalent but typical variant comparisons such as **findBreakpointOverlaps**() will not match these variants. The **findInsDupOverlaps**() function can be used to identify duplications and insertions that are equivalent.
+
+
+```{r test}
+# test: match delly/wham calls
+# both callers call from relatively large SVs to small SVs
+
+findBreakpointOverlaps(delly_svgr, manta_svgr)
+```
+
+What to do with the resultant object?
+```{r test}
+dellyXmanta <- findBreakpointOverlaps(delly_svgr, manta_svgr, 
+                                      maxgap=100, sizemargin=0.5)
+
+head(dellyXmanta@from) ##
+head(dellyXmanta@to)
+
+test <- data.frame(dellyXmanta@from, 
+                   dellyXmanta@to)
+
+head(delly_svgr@ranges)
+```
+
+```{r Six pairwise comparison}
+# C(4,2) = 6 comparisons
+dellyXmanta <- findBreakpointOverlaps(delly_svgr, manta_svgr)
+dellyXmelt <- findBreakpointOverlaps(delly_svgr, melt_svgr)
+dellyXwham <- findBreakpointOverlaps(delly_svgr, wham_svgr)
+
+mantaXmelt <- findBreakpointOverlaps(manta_svgr, melt_svgr)
+mantaXwham <- findBreakpointOverlaps(manta_svgr, wham_svgr)
+
+meltXwham <- findBreakpointOverlaps(melt_svgr, wham_svgr)
+```
+
+
+
+
+
+
+
 ## Visualising breakpoint pairs via circos plots
 
 One way of visualising paired breakpoints is by circos plots.
 
 Here, we use the plotting package ggbio which provides flexible track functions which bind with ggplot2 objects. It takes GRanges objects as input and supports circos plots. To plot structural variant breakpoints in a circos plot using ggbio, we need to first prepare the breakpoint GRanges. The function requires a special column, indicating the end of the link using GRanges format.
 
+```{r circos setup subset}
+# test on subset first as the original took very long
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+
+small_wham_vcf <- readVcf("NA12878_small.wham.vcf", "hg38")
+small_wham_svgr <- breakpointRanges(small_wham_vcf)
+```
+
+
 ```{r circos}
 suppressPackageStartupMessages(require(ggbio))
+# augment seqlevels from the original hg19
+chrom <- c("chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12",
+           "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY")
+# 
+##gr.test <- delly_svgr[seqnames(delly_svgr) %in% chrom]
+#
+gr.test <- small_wham_svgr[seqnames(small_wham_svgr) %in% chrom]
 
-gr.circos <- svgr[seqnames(svgr) %in% seqlevels(biovizBase::hg19sub)]
+seqlevels(gr.test) <- chrom
+#
+mcols(gr.test)$to.gr <- granges(partner(gr.test))
 
-seqlevels(gr.circos) <- seqlevels(biovizBase::hg19sub)
-
-mcols(gr.circos)$to.gr <- granges(partner(gr.circos))
-
-gr.circos <- na.omit(gr.circos)
 
 #We can then plot the breakpoints against reference genomes.
 
 ggbio() +
-    circle(gr.circos, geom="link", linked.to="to.gr") +
-    circle(biovizBase::hg19sub, geom='ideo', fill='gray70') +
-    circle(biovizBase::hg19sub, geom='scale', size=2) +
-    circle(biovizBase::hg19sub, geom='text', aes(label=seqnames), vjust=0, size=3)
+    circle(gr.test, geom="link", linked.to="to.gr") +
+    circle(chrom, geom='ideo', fill='gray70') +
+    circle(chrom, geom='scale', size=2) +
+    circle(chrom, geom='text', aes(label=seqnames), vjust=0, size=3)
 ```
+
+
+### use package "circlize"
+```{r}
+library(circlize)
+# extract chr end points
+chrRanges=head(as.vector(biovizBase::ideo@ranges), n=24)
+chr.match=regexpr("[0-9]{6,}", chrRanges)
+chr.end=regmatches(chrRanges, chr.match)
+# start circos
+circos.clear()
+circos.initialize(factors=chrom, 
+                  xlim=matrix(c(rep(1, 24), 
+                                chr.end), 
+                              ncol=2))
+
+circos.clear()
+col_text <- "grey40"
+circos.par("track.height"=0.8, gap.degree=5, cell.padding=c(0, 0, 0, 0))
+circos.initialize(factors=ref$V1, xlim=matrix(c(rep(0, 3), ref$V2), ncol=2))
+
+# genomes
+circos.track(ylim=c(0, 1), panel.fun=function(x, y) {
+chr=seqnames(small_wham_svgr)
+xlim=CELL_META$xlim
+ylim=CELL_META$ylim
+circos.text(mean(xlim), mean(ylim), chr, cex=0.5, col=col_text, 
+facing="bending.inside", niceFacing=TRUE)
+}, bg.col="grey90", bg.border=F, track.height=0.06)
+```
+
