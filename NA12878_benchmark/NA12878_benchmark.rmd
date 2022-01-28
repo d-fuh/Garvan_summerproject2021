@@ -39,30 +39,12 @@ knitr::opts_chunk$set(
 ```{r Packages}
 library(tidyverse)
 library(paletteer)
+library(patchwork)
 library(GenomicRanges)
 library(StructuralVariantAnnotation)
 ```
 
 # Truth SV set of NA12878
-
-## BED files (CHROM, POS, END)
-
-- Personalis_deletions_hg38.bed
-- Spiral_Genetics_insertions_hg38.bed
-
-```{r eval=FALSE}
-setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
-
-personalis <- read.table("Personalis_deletions_hg38.bed")
-spiral <- read.table("Spiral_Genetics_insertions_hg38.bed")
-```
-
-
-## VCF file (Papenfuss Lab)
-```{r eval=FALSE}
-truth_vcf <- readVcf("NA12878_truth.vcf", "hg38")
-```
-
 
 ## VCF file (hg38, Personalis & Spiral)
 ```{r READ IN Truth SV set NA12878}
@@ -75,13 +57,12 @@ truth_vcf <- rbind(personalis_vcf, spiral_vcf)
 ```
 
 
-
-# Benchmarking the big 4: "Delly, Manta, Melt, Wham"
+# Benchmarking against the truth set
 
 ## BreakpointRanges
 ```{r caller_svgr generation}
 setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
-
+# full-sized
 delly_vcf <- readVcf("NA12878.delly.vcf", "hg38")
 delly_svgr <- breakpointRanges(delly_vcf)
 
@@ -94,8 +75,40 @@ melt_svgr <- breakpointRanges(melt_vcf)
 wham_vcf <- readVcf("NA12878.wham.vcf", "hg38")
 wham_svgr <- breakpointRanges(wham_vcf)
 
-#svaba_vcf <- readVcf("NA12878_small.svaba.vcf")
-#svaba_svgr <- breakpointRanges(svaba_vcf)
+svaba_vcf <- readVcf("NA12878.svaba.vcf", "hg38")
+svaba_svgr <- breakpointRanges(svaba_vcf)
+
+# med-sized
+med_delly_vcf <- readVcf("NA12878_med.delly.vcf", "hg38")
+med_delly_svgr <- breakpointRanges(med_delly_vcf)
+
+med_manta_vcf <- readVcf("NA12878_med.manta.vcf", "hg38")
+med_manta_svgr <- breakpointRanges(med_manta_vcf)
+
+med_melt_vcf <- readVcf("NA12878_med.melt.vcf", "hg38")
+med_melt_svgr <- breakpointRanges(med_melt_vcf)
+
+med_wham_vcf <- readVcf("NA12878_med.wham.vcf", "hg38")
+med_wham_svgr <- breakpointRanges(med_wham_vcf)
+
+med_svaba_vcf <- readVcf("NA12878_med.svaba.vcf", "hg38")
+med_svaba_svgr <- breakpointRanges(med_svaba_vcf)
+
+# small-sized
+small_delly_vcf <- readVcf("NA12878_small.delly.vcf", "hg38")
+small_delly_svgr <- breakpointRanges(small_delly_vcf)
+
+small_manta_vcf <- readVcf("NA12878_small.manta.vcf", "hg38")
+small_manta_svgr <- breakpointRanges(small_manta_vcf)
+
+small_melt_vcf <- readVcf("NA12878_small.melt.vcf", "hg38")
+small_melt_svgr <- breakpointRanges(small_melt_vcf)
+
+small_wham_vcf <- readVcf("NA12878_small.wham.vcf", "hg38")
+small_wham_svgr <- breakpointRanges(small_wham_vcf)
+
+small_svaba_vcf <- readVcf("NA12878_small.svaba.vcf", "hg38")
+small_svaba_svgr <- breakpointRanges(small_svaba_vcf)
 ```
 
 ## svgr filter
@@ -105,123 +118,80 @@ delly_svgr=subset(delly_svgr, delly_svgr@elementMetadata[, 5] == "PASS") ## 7816
 manta_svgr=subset(manta_svgr, manta_svgr@elementMetadata[, 5] == "PASS") ## 12080/14174 (SampleFT, MinQUAL, ...)
 melt_svgr=subset(melt_svgr, melt_svgr@elementMetadata[, 5] == "PASS") ## 2006/3782 (looks mostly lowQUAL)
 wham_svgr=subset(wham_svgr, wham_svgr@elementMetadata[, 5] == "PASS") ## 12788/12788 (looks ALL PASS)
+svaba_svgr=subset(svaba_svgr, svaba_svgr@elementMetadata[, 5] == "PASS") ## 5804/5804 (ALL PASS)
+
+# med
+med_delly_svgr=subset(med_delly_svgr, med_delly_svgr@elementMetadata[, 5] == "PASS") ## 1544/?
+med_manta_svgr=subset(med_manta_svgr, med_manta_svgr@elementMetadata[, 5] == "PASS") ## 474/?
+med_melt_svgr=subset(med_melt_svgr, med_melt_svgr@elementMetadata[, 5] == "PASS") ## 904/?
+med_wham_svgr=subset(med_wham_svgr, med_wham_svgr@elementMetadata[, 5] == "PASS") ## 2118/?
+med_svaba_svgr=subset(med_svaba_svgr, med_svaba_svgr@elementMetadata[, 5] == "PASS") ## 1070/?
+
+# small
+small_delly_svgr=subset(small_delly_svgr, small_delly_svgr@elementMetadata[, 5] == "PASS") ## 372/?
+small_manta_svgr=subset(small_manta_svgr, small_manta_svgr@elementMetadata[, 5] == "PASS") ## 238/?
+small_melt_svgr=subset(small_melt_svgr, small_melt_svgr@elementMetadata[, 5] == "PASS") ## 196/?
+small_wham_svgr=subset(small_wham_svgr, small_wham_svgr@elementMetadata[, 5] == "PASS") ## 548/?
+small_svaba_svgr=subset(small_svaba_svgr, small_svaba_svgr@elementMetadata[, 5] == "PASS") ## 280/?
 ```
 
-
-
-## partner
-```{r partner ignore, eval=FALSE}
-partner(delly_svgr)
-partner(delly_svgr, selfPartnerSingleBreakends = TRUE)
-```
-
-## Ensuring breakpoint consistency
-```{r countBreakpointOverlaps ignore, eval=FALSE}
-NAS_delly_chr6_breakpoints <- delly_svgr[seqnames(delly_svgr) == "chr6"]
-# A call to findBreakpointOverlaps(colo828_chr6_breakpoints, colo828_chr6_breakpoints)
-# will fail as there are a) single breakends, and b) breakpoints with missing partners
-NAS_chr6_breakpoints <- NAS_delly_chr6_breakpoints[hasPartner(NAS_delly_chr6_breakpoints)]
-# As expected, each call on chr6 only overlaps with itself
-countBreakpointOverlaps(NAS_chr6_breakpoints, NAS_chr6_breakpoints)
-#> [1] 1 1 1 1 1 1
-```
-
----extracted content below---
-
-> Note that if you did want to include inter-chromosomal breakpoints involving chromosome 6, you would need to update the filtering criteria to include records with chr6 on either side. In such cases, the filtering logic can be simplified by the selfPartnerSingleBreakends parameter of **partner**(). When **selfPartnerSingleBreakends**=TRUE, the partner of single breakend events is considered to be the single breakend itself.
-
----end of extracted content---
-
-
-## Benchmarking: Recall
+## Caller
 ```{r Assigning callers to svgr}
 # assign caller info
 delly_svgr$Caller <- "Delly"
 manta_svgr$Caller <- "Manta"
 melt_svgr$Caller <- "Melt"
 wham_svgr$Caller <- "Wham"
+svaba_svgr$Caller <- "SvABA"
+
+# med
+med_delly_svgr$Caller <- "Delly"
+med_manta_svgr$Caller <- "Manta"
+med_melt_svgr$Caller <- "Melt"
+med_wham_svgr$Caller <- "Wham"
+med_svaba_svgr$Caller <- "SvABA"
+
+# small
+small_delly_svgr$Caller <- "Delly"
+small_manta_svgr$Caller <- "Manta"
+small_melt_svgr$Caller <- "Melt"
+small_wham_svgr$Caller <- "Wham"
+small_svaba_svgr$Caller <- "SvABA"
+```
+
+## Coverage
+```{r Assigning coverage to svgr}
+# assign coverage info
+delly_svgr$Cov <- "Large"
+manta_svgr$Cov <- "Large"
+melt_svgr$Cov <- "Large"
+wham_svgr$Cov <- "Large"
+svaba_svgr$Cov <- "Large"
+
+# med
+med_delly_svgr$Cov <- "Medium"
+med_manta_svgr$Cov <- "Medium"
+med_melt_svgr$Cov <- "Medium"
+med_wham_svgr$Cov <- "Medium"
+med_svaba_svgr$Cov <- "Medium"
+
+# small
+small_delly_svgr$Cov <- "Small"
+small_manta_svgr$Cov <- "Small"
+small_melt_svgr$Cov <- "Small"
+small_wham_svgr$Cov <- "Small"
+small_svaba_svgr$Cov <- "Small"
 ```
 
 ## truth_svgr
-```{r BED version, eval=FALSE}
-# truth svgr
-# 1. Personalis
-truth_svgr <- GenomicRanges::GRanges(
-  seqnames = personalis$V1, 
-  ranges=IRanges(start=personalis$V2, end=personalis$V3)
-  )
-
-# 2. Spiral
-truth_svgr <- GenomicRanges::GRanges(
-  seqnames = spiral$V1, 
-  ranges=IRanges(start=spiral$V2, end=spiral$V3)
-  )
-```
-
-```{r Papenfuss version (hg19), eval=FALSE}
-# Papenfuss Lab
-truth_svgr <- breakpointRanges(truth_vcf)
-```
 
 ```{r Personalis & Spiral VCF}
 truth_svgr <- breakpointRanges(truth_vcf)
 ```
 
-
-
-```{r svgr and truth_matches, eval=FALSE}
-# countBreakpointOverlaps
-# Papenfuss used the vector version
-# we will test the individual version later
-svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr)
-
-svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr, ## note vectorised comparison
-  # read pair based callers make imprecise calls.
-  # A margin around the call position is required when matching with the truth set
-  maxgap=100,
-  # Since we added a maxgap, we also need to restrict the mismatch between the
-  # size of the events. We don't want to match a 100bp deletion with a
-  # 5bp duplication. This will happen if we have a 100bp margin but don't also
-  # require an approximate size match as well
-  sizemargin=0.25,
-  # We also don't want to match a 20bp deletion with a 20bp deletion 80bp away
-  # by restricting the margin based on the size of the event, we can make sure
-  # that simple events actually do overlap
-  restrictMarginToSizeMultiple=0.5,
-  # HYDRA makes duplicate calls and will sometimes report a variant multiple
-  # times with slightly different bounds. countOnlyBest prevents these being
-  # double-counted as multiple true positives.
-  countOnlyBest=TRUE
-  )
-```
-
-```{r Precision-Recall plot, eval=FALSE}
-# plot
-# need to understand what each term/param means...
-ggplot(as.data.frame(svgr) %>%
-  dplyr::select(QUAL, Caller, truth_matches) %>%
-  dplyr::group_by(Caller, QUAL) %>%
-  dplyr::summarise(
-    calls=dplyr::n(),
-    tp=sum(truth_matches > 0)) %>%
-  dplyr::group_by(Caller) %>%
-  dplyr::arrange(dplyr::desc(QUAL)) %>%
-  dplyr::mutate(
-    cum_tp=cumsum(tp),
-    cum_n=cumsum(calls),
-    cum_fp=cum_n - cum_tp,
-    Precision=cum_tp / cum_n,
-    Recall=cum_tp/length(truth_svgr))) +
-  aes(x=Recall, y=Precision, colour=Caller) +
-  geom_point() +
-  geom_line() +
-  theme_bw() +
-  labs(title="NA12878 Delly/Manta/Melt/Wham calls vs Truth Set \n from the Papenfuss Lab")
-```
-
-```{r truth_matches for each caller}
+```{r Precision X Recall plot <ORIGINAL>}
 # Delineate each term
-svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr)
+svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
 
 # delly: RP + SR
 # manta: RP + SR + LA
@@ -230,7 +200,7 @@ svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr)
 
 svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr, 
                                               
-                                              maxgap=200, sizemargin=0.25, ## explain
+                                              maxgap=100, sizemargin=0.25, ## explain
                                               
                                               restrictMarginToSizeMultiple=0.5, ## explain
                                               
@@ -268,21 +238,81 @@ ggplot(as.data.frame(svgr) %>%
   
 aes(x=Recall, y=Precision, colour=Caller) +
 
-  geom_point() +
+  geom_point(size=2.5) +
   geom_line() +
   theme_bw() +
-  labs(title="NA12878 Delly/Manta/Melt/Wham calls vs Truth Set \n (Personalis & Spiral)")
+  labs(title="Delly/Manta/Melt/Wham/SvABA SV calls vs Truth Set \n (NA12878; Personalis & Spiral)")
+```
+```{r SUBSETS}
+svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
+med_svgr <- c(med_delly_svgr, med_manta_svgr, med_melt_svgr, med_wham_svgr, med_svaba_svgr)
+small_svgr <- c(small_delly_svgr, small_manta_svgr, small_melt_svgr, small_wham_svgr, small_svaba_svgr)
+
+svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
+                                              maxgap=100, sizemargin=0.25, 
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+med_svgr$truth_matches <- countBreakpointOverlaps(med_svgr, truth_svgr, 
+                                                  maxgap=100, sizemargin=0.25, 
+                                                  restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+small_svgr$truth_matches <- countBreakpointOverlaps(small_svgr, truth_svgr, 
+                                                    maxgap=100, sizemargin=0.25, 
+                                                    restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+ALL_svgr <- c(svgr, med_svgr, small_svgr)
+
+ggplot(as.data.frame(ALL_svgr) %>%
+         
+         dplyr::select(Caller, Cov, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
+  
+         dplyr::group_by(Caller, Cov) %>%
+  
+    dplyr::summarise(
+    
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+    
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
+  
+    dplyr::group_by(Caller, Cov) %>%
+  
+    #dplyr::arrange(dplyr::desc(QUAL)) %>% ## QUAL doesn't work in our workflow, leave it
+  
+    dplyr::mutate(
+    
+      cum_tp=cumsum(tp),
+    
+      cum_n=cumsum(calls),
+    
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+    
+      Recall=cum_tp/length(truth_svgr)
+      )
+  ) +
+  
+aes(x=Recall, y=Precision, colour=Caller) +
+
+  geom_point(size=2.5) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~Cov) +
+  labs(title="Precision X Recall plot for five SV callers vs Truth Set \n (NA12878; Personalis & Spiral; 3 coverage levels)")
 ```
 
-```{r}
+```{r USE precision recall plot <ORIGINAL>}
 # indiv. version
 
 # delly: RP + SR
 # manta: RP + SR + LA
 # melt: 
 # wham: 
+# svaba:
 
 # fine-tune each param for each caller later
+# note that if any of the callers use different settings, must report as the previous
+# vectroised version used "one-setting-for-all"
 delly_svgr$truth_matches <- countBreakpointOverlaps(delly_svgr, 
                                               truth_svgr, 
                                               maxgap=100, sizemargin=0.25,
@@ -293,12 +323,17 @@ manta_svgr$truth_matches <- countBreakpointOverlaps(manta_svgr,
                                               restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
 melt_svgr$truth_matches <- countBreakpointOverlaps(melt_svgr, 
                                              truth_svgr, 
-                                             maxgap=50, sizemargin=0.25,
+                                             maxgap=100, sizemargin=0.25,
                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
 wham_svgr$truth_matches <- countBreakpointOverlaps(wham_svgr, 
                                              truth_svgr, 
                                              maxgap=100, sizemargin=0.25,
                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+svaba_svgr$truth_matches <- countBreakpointOverlaps(svaba_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
 # plot
 # instead of using Papenfuss' Precision-Recall plot,
 # let's understand the data (Caller$caller_matches) and work from there
@@ -309,7 +344,7 @@ wham_svgr$truth_matches <- countBreakpointOverlaps(wham_svgr,
 
 # idea: group the big four into one so we can color by group / facet_wrap
 
-svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr)
+svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
 
 # plot again
 ## overall recall?
@@ -318,7 +353,181 @@ ggplot(as.data.frame(svgr)) +
   geom_bar(position = "dodge")
 
 ## recall rate
-ggplot(as.data.frame(svgr) %>%
+as.data.frame(svgr) %>%
+         
+         dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
+  
+         dplyr::group_by(Caller) %>%
+  
+    dplyr::summarise(
+    
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+    
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
+  
+    dplyr::group_by(Caller) %>%
+  
+    dplyr::mutate(
+    
+      cum_tp=cumsum(tp),
+    
+      cum_n=cumsum(calls),
+    
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+    
+      Recall=cum_tp/length(truth_svgr)
+      ) %>%
+
+ggplot() +  
+  geom_point(aes(x=Caller, y=Precision)) +
+  geom_point(aes(x=Caller, y=Recall), shape = 21, fill="red", size=2.5) +
+  ylab("Precision (black filled) & Recall (red filled)")
+```
+
+
+```{r USE precision recall plot <SUBSET BAR>}
+# indiv. version
+
+# plot
+# idea: group the big four into one so we can color by group / facet_wrap
+
+## overall recall?
+L1 <- ggplot(as.data.frame(svgr)) +
+  aes(x=truth_matches, fill=Caller) +
+  geom_bar(position = "dodge") + ggtitle("Large") + ylab("") + theme(legend.position = "none")
+
+M1 <- ggplot(as.data.frame(med_svgr)) +
+  aes(x=truth_matches, fill=Caller) +
+  geom_bar(position = "dodge") + ggtitle("Medium") + ylab("") + theme(legend.position = "none")
+
+S1 <- ggplot(as.data.frame(small_svgr)) +
+  aes(x=truth_matches, fill=Caller) +
+  geom_bar(position = "dodge") + ggtitle("Small") + 
+  theme(legend.position = c(.95, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6))
+
+grid.arrange(L1, M1, S1, nrow=1)
+```
+
+
+```{r USE precision recall plot <SUBSET POINTS>}
+## recall rate
+as.data.frame(svgr) %>%
+         
+         dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
+  
+         dplyr::group_by(Caller) %>%
+  
+    dplyr::summarise(
+    
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+    
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
+  
+    dplyr::group_by(Caller) %>%
+  
+    dplyr::mutate(
+    
+      cum_tp=cumsum(tp),
+    
+      cum_n=cumsum(calls),
+    
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+    
+      Recall=cum_tp/length(truth_svgr)
+      ) %>%
+
+ggplot() +  
+  geom_point(aes(x=Caller, y=Precision)) +
+  geom_point(aes(x=Caller, y=Recall), shape = 21, fill="red", size=2.5) +
+  ylab("Precision (black) & Recall (red) \n Large (mean ~35X)") -> L2
+
+# med
+as.data.frame(med_svgr) %>%
+         
+         dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
+  
+         dplyr::group_by(Caller) %>%
+  
+    dplyr::summarise(
+    
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+    
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
+  
+    dplyr::group_by(Caller) %>%
+  
+    dplyr::mutate(
+    
+      cum_tp=cumsum(tp),
+    
+      cum_n=cumsum(calls),
+    
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+    
+      Recall=cum_tp/length(truth_svgr)
+      ) %>%
+
+ggplot() +  
+  geom_point(aes(x=Caller, y=Precision)) +
+  geom_point(aes(x=Caller, y=Recall), shape = 21, fill="red", size=2.5) +
+  ylab("Medium (mean ~6X)") -> M2
+
+# small
+as.data.frame(small_svgr) %>%
+         
+         dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
+  
+         dplyr::group_by(Caller) %>%
+  
+    dplyr::summarise(
+    
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+    
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
+  
+    dplyr::group_by(Caller) %>%
+  
+    dplyr::mutate(
+    
+      cum_tp=cumsum(tp),
+    
+      cum_n=cumsum(calls),
+    
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+    
+      Recall=cum_tp/length(truth_svgr)
+      ) %>%
+
+ggplot() +  
+  geom_point(aes(x=Caller, y=Precision)) +
+  geom_point(aes(x=Caller, y=Recall), shape = 21, fill="red", size=2.5) +
+  ylab("Small (mean ~1X)") -> S2
+
+L2 + M2 + S2
+```
+
+```{r Synthesis of three cov levels P/R}
+# extract the numeric info instead to simplify things
+# we need a new data frame
+test <- data.frame()
+# extract the key variables
+# we need:
+# Precision for each caller, for each coverage level
+# Recall rate for each caller, and for each coverage
+
+## large
+test_large = as.data.frame(svgr) %>%
          
          dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
   
@@ -344,15 +553,60 @@ ggplot(as.data.frame(svgr) %>%
     
       Recall=cum_tp/length(truth_svgr)
       )
-  ) +
+test_large$Cov <- "Large"
+
+## medium
+test_medium = as.data.frame(med_svgr) %>%
+         dplyr::select(Caller, truth_matches) %>%
+         dplyr::group_by(Caller) %>%
+    dplyr::summarise(
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
   
-aes(x=Caller, y=Recall, fill=Caller) + geom_delaunay_segment(position="dodge")
+    dplyr::group_by(Caller) %>%
+  
+    dplyr::mutate(
+      cum_tp=cumsum(tp),
+      cum_n=cumsum(calls),
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+      Recall=cum_tp/length(truth_svgr)
+      )
+test_medium$Cov <- "Medium"
+
+## small
+test_small = as.data.frame(small_svgr) %>%
+         dplyr::select(Caller, truth_matches) %>%
+         dplyr::group_by(Caller) %>%
+    dplyr::summarise(
+      calls=dplyr::n(), ## number of calls for each caller that matches the truth
+      tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
+  
+    dplyr::group_by(Caller) %>%
+  
+    dplyr::mutate(
+      cum_tp=cumsum(tp),
+      cum_n=cumsum(calls),
+      cum_fp=cum_n - cum_tp,
+    
+      Precision=cum_tp / cum_n,
+      Recall=cum_tp/length(truth_svgr)
+      )
+test_small$Cov <- "Small"
+
+# full join
+test <- plyr::join(test_large, test_medium, type = "full") %>% plyr::join(., test_small, type = "full")
 ```
 
-
-
-
-
+```{r}
+# plot
+ggplot(test) +
+  geom_point(aes(x=Caller, y=Precision)) +
+  geom_point(aes(x=Caller, y=Recall), shape=25, fill="red", size=2.5) +
+  facet_wrap(~Cov) +
+  ylab("Precision (black dot) & Recall (Red triangle)")
+```
 
 
 
@@ -431,7 +685,7 @@ small_wham_svgr <- breakpointRanges(small_wham_vcf)
 ```
 
 
-```{r circos}
+```{r circos, eval=FALSE}
 suppressPackageStartupMessages(require(ggbio))
 # augment seqlevels from the original hg19
 chrom <- c("chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12",
