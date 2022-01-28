@@ -685,7 +685,15 @@ consensus=whamMantaDellySvaba[whamMantaDellySvaba$meltmatch==1] ## n=0 (!)
 
 
 ```{r Annotate with caller number}
+svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
 
+## why does dellymatch give NA?
+svgr$dellymatch ## NA
+svgr$mantamatch ## looks normal
+
+# if a variant call is called by k out of the five callers,
+# let a new column $numCallers = k for that row
+svgr$numCallers=
 ```
 
 
