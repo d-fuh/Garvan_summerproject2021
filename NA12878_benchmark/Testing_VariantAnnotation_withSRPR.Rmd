@@ -150,23 +150,15 @@ head(info(delly_vcf))
 
 
 You can pull any variables from INFO into the resulting breakpointRanges object using "info_columns"
-```{r create delly.bpr and delly.bpr.SRPE (Both svgr objects)}
-delly.bpr.SRPE=breakpointRanges(delly_vcf, info_columns=c("SR", "PE", "RC"))
-#delly.bpr=breakpointRanges(delly_vcf)
-#head(delly.bpr) ## without SR & PE columns
-head(delly.bpr.SRPE) ## with SR & PE columns, multi NA
-```
+```{r create delly.bpr and delly.bpr (Both svgr objects)}
+delly.bpr=breakpointRanges(delly_vcf, info_columns=c("SR", "PE", "RC"))
+head(delly.bpr) ## with SR & PE columns, multi NA
 
+# Assign a column for caller name
+delly.bpr$Caller="Delly"
 
-### Assign a column for caller name
-```{r Assign $Caller Delly}
-delly.bpr.SRPE$Caller="Delly"
-```
-
-
-### Need to filter out the variants that pass
-```{r Delly filter}
-delly.bpr.SRPE=delly.bpr.SRPE[which(delly.bpr.SRPE$FILTER=="PASS")]
+# Need to filter out the variants that pass
+delly.bpr=delly.bpr[which(delly.bpr$FILTER=="PASS")]
 ```
 
 
@@ -309,9 +301,16 @@ rm(DR,SR,AD)
 ```
 
 
-### Need to filter out the variants that pass
-```{r}
-svaba.bpr.SRDR=svaba.bpr.SRDR[which(svaba.bpr.SRDR$FILTER=="PASS")]
+### convert vcf to svgr
+```{r warning=FALSE}
+# lost of warnings on chrM somehow
+svaba.bpr<-breakpointRanges(svaba_vcf, info_columns=c("SR", "DR", "AD"))
+
+# Assign a column for caller name
+svaba.bpr$Caller="SvABA"
+
+# Need to filter out the variants that pass
+svaba.bpr=svaba.bpr[which(svaba.bpr$FILTER=="PASS")]
 ```
 
 
@@ -430,28 +429,21 @@ melt.bpr=melt.bpr[which(melt.bpr$FILTER=="PASS")]
 
 ## Find overlaps between delly and svaba and map these to the delly file:
 
-```{r augment svaba svgr with the new SR/DR info stored in its vcf, warning=FALSE}
-# there is a warning (a very long one) regarding chrM
-svaba.bpr.SRDR=breakpointRanges(svaba_vcf) ## update svgr
-svaba.bpr.SRDR$Caller="SvABA" ## assign caller
-```
-
-
 ```{r}
 # count bp overlaps between delly and svaba
-delly.bpr.SRPE$svabamatch=countBreakpointOverlaps(delly.bpr.SRPE, svaba.bpr.SRDR, 
+delly.bpr$svabamatch=countBreakpointOverlaps(delly.bpr, svaba.bpr, 
                                               maxgap=100, sizemargin = 0.25, 
                                               restrictMarginToSizeMultiple = 0.5, countOnlyBest=T)
 
-head(delly.bpr.SRPE) ## check updated svgr
+head(delly.bpr) ## check updated svgr
 
-table(delly.bpr.SRPE$svabamatch) ## see how many calls from delly matched with svaba
+table(delly.bpr$svabamatch) ## see how many calls from delly matched with svaba
 ```
 
 
 ## find overlaps between svaba and truth
 ```{r}
-truth_personalis.bpr$svabamatch=countBreakpointOverlaps(truth_personalis.bpr, svaba.bpr.SRDR, 
+truth_personalis.bpr$svabamatch=countBreakpointOverlaps(truth_personalis.bpr, svaba.bpr, 
                                                         maxgap=100, sizemargin = 0.25,
                                                         restrictMarginToSizeMultiple = 0.5, countOnlyBest=T)
 head(truth_personalis.bpr)
@@ -461,11 +453,11 @@ table(truth_personalis.bpr$svabamatch)
 
 We can also annotate the Delly svgr with which variants overlap with the truth set:
 ```{r}
-delly.bpr.SRPE$truthmatch=countBreakpointOverlaps(delly.bpr.SRPE, truth_personalis.bpr, 
+delly.bpr$truthmatch=countBreakpointOverlaps(delly.bpr, truth_personalis.bpr, 
                                                   maxgap=100, sizemargin = 0.25, 
                                                   restrictMarginToSizeMultiple = 0.5, countOnlyBest=T)
-head(delly.bpr.SRPE)
-table(delly.bpr.SRPE$truthmatch)
+head(delly.bpr)
+table(delly.bpr$truthmatch)
 ```
 
 
@@ -473,13 +465,13 @@ Now, you can try to compare SR and PE for the samples which are matched to the t
 
 e.g. In Delly, of those that matches the truth set, we want to see their support read info:
 ```{r}
-summary(delly.bpr.SRPE$SR[which(delly.bpr.SRPE$truthmatch==1)])
-boxplot(delly.bpr.SRPE$SR[which(delly.bpr.SRPE$truthmatch==1)])
+summary(delly.bpr$SR[which(delly.bpr$truthmatch==1)])
+boxplot(delly.bpr$SR[which(delly.bpr$truthmatch==1)])
 ```
 
 Similarly, for PE:
 ```{r}
-summary(delly.bpr.SRPE$PE[which(delly.bpr.SRPE$truthmatch==1)])
-boxplot(delly.bpr.SRPE$PE[which(delly.bpr.SRPE$truthmatch==1)])
+summary(delly.bpr$PE[which(delly.bpr$truthmatch==1)])
+boxplot(delly.bpr$PE[which(delly.bpr$truthmatch==1)])
 ```
 

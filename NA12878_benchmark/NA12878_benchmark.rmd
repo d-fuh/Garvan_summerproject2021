@@ -576,6 +576,15 @@ ggplot(test) +
 ```
 
 
+```{r}
+# want to know more about the non-zero recalls in NA12878 small subset
+# to do that, we need support read info
+# use the script "Add_support_read_info.R"
+
+# output files: caller.bpr x5 and caller_vcf x5
+
+supported_svgr=c(delly.bpr, manta.bpr, svaba.bpr, melt.bpr, wham.bpr)
+```
 
 
 
