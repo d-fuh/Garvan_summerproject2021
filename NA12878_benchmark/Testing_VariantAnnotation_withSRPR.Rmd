@@ -1,0 +1,485 @@
+---
+title: "Importing Support Read Info"
+output: html_notebook
+---
+This is a copy of: Testing David's functions.R
+```{r setup}
+library(StructuralVariantAnnotation)
+```
+
+
+# 1. Load Example truth set: personalis
+```{r truth_personalis read in, warning=FALSE}
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+truth_personalis <- readVcf("test_personalis_hg38.vcf")
+truth_personalis.bpr=breakpointRanges(truth_personalis)
+```
+
+
+# 2. Importing support read info from Delly, Manta, and Svaba vcf
+
+## Summary of support read info extracted from each caller
+
+|Caller|Stats used         |Waiting list  |Currently unconsidered variables|
+|:-----|:------------------|:------------:|:------------------------------:|
+|Delly |SR, PE, RC         |              |                                |
+|SvABA |SR, DR, AD         |DP=NA         |                                |
+|Manta |SR, PR, BND_DEPTH  |              |                                |
+|Wham  |SR, SP             |DP=NA         |D, I, SS?, T                    |
+|Melt  |LP, RP             |              |RA?                             |
+
+
+## Glossary: Support read info terms definition
+
+In alphabetical order:
+
+|Support type|Definition                                                     |Found in caller vcf (v=Imported)            |
+|:----------:|:--------------------------------------------------------------|:------------------------------------------:|
+|AD          |"Allele depth: Number of reads supporting the variant"         |SvABA [v]                                   |
+|BND_DEPTH   |"Read depth at local translocation breakend"                   |Manta [v]                                   |
+|D           |"Number of reads supporting a deletion"                        |Wham                                        |
+|DP          |"Depth of coverage: Number of reads covering site."            |SvABA, Wham                                 |
+|            |(FORMAT) "Read Depth" (Wham)                                   |                                            | 
+|DR          |"Number of discordant-supported reads for this variant"        |SvABA [v]                                   |
+|DR^2        |"# high-quality reference pairs"                               |Delly                                       |
+|DV          |"# high-quality variant pairs"                                 |Delly                                       |
+|I           |"Number of reads supporting an insertion"                      |Wham                                        |
+|LP          |"Total number of discordant pairs supporting the               |Melt [v]                                    |
+|            | *left* side of the breakpoint" (Melt)                         |                                            |
+|PE          |"Paired-end support of the structural variant"                 |Delly [v]                                   |
+|PR          |"Spanning paired-read support for the ref and alt alleles      |Manta [v]                                   |
+|            |in the order listed"                                           |                                            |
+|RA          |"*Ratio* between LP and RP, reported as log2(LP / RP)"         |Melt                                        |
+|RC          |"Raw high-quality read counts for the SV"                      |Delly [v]                                   |
+|RP          |"Total number of discordant pairs supporting the               |Melt [v]                                    |
+|            | *right* side of the breakpoint" (Melt)                        |                                            |
+|SP          |"Per sample SV support"                                        |Wham [v]                                    |
+|SR          |"Number of spanning reads for this variants" (SvABA)           |SvABA [v], Delly [v], Manta [v], Wham [v]   |
+|            |"Split-read support" (Delly)                                   |                                            |
+|            |"Split reads for the ref and alt alleles in the order listed,  |                                            |
+|            | for reads where P(allele|read)>0.999" (Manta)                 |                                            |
+|            |"Number of split-reads supporting SV" (Wham)                   |                                            |
+|SS          |"Number of split-reads supporting SV"                          |Wham                                        |
+|            |(What's the difference to SR?)                                 |                                            |
+|T           |"Number of reads supporting a BND"                             |Wham                                        |
+|TF          |"Number of reads mapped too far"                               |Wham                                        |
+|U           |"Number of reads supporting a duplication"                     |Wham                                        |
+|V           |"Number of reads supporting an inversion"                      |Wham                                        |
+
+
+
+
+
+## Delly: SR, PE, RC
+```{r load delly vcf}
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+delly_vcf<-readVcf("NA12878_small.delly.vcf")
+head(delly_vcf)
+```
+
+
+Note that there are 2 main components of this object:
+
+- 1. An "**info**" data.frame which contains the *chr location* + information in "*INFO*" column
+- 2. A "**geno**" list which contains information in the "*GT*" column - This is also the NA12878 *genotype* information
+
+
+### To Get the information on Paired Reads and Spanning Reads:
+
+Note that the header of Delly says:
+
+PE:
+
+> INFO=<ID=PE,Number=1,Type=Integer,Description="*Paired-end support* of the structural variant">									
+
+SR:
+
+> INFO=<ID=SR,Number=1,Type=Integer,Description="*Split-read support*">	
+
+RC:
+
+> FORMAT=<ID=RC,Number=1,Type=Integer,Description="*Raw high-quality read counts* for the SV">
+
+
+## Confirm:
+
+- PE=16 means 
+- SR=7 means
+- RC=5613479 means
+
+Note that SR also comes with SRQ (quality measure) and PE comes with MAPQ but these are not extracted.
+
+SRQ:
+
+> INFO=<ID=SRQ,Number=1,Type=Float,Description="Split-read consensus alignment quality">
+
+MAPQ:
+
+> INFO=<ID=MAPQ,Number=1,Type=Integer,Description="Median mapping quality of paired-ends">
+
+
+
+This info is stored in INFO, so we need to pull it out using the command:
+```{r info(delly_vcf)}
+head(info(delly_vcf))
+```
+
+### Import RC from GT
+```{r Extract RC from geno(delly_vcf) to info(svaba)}
+# we also want RC from GT in delly_vcf
+head(geno(delly_vcf)) # six columns
+RC=geno(delly_vcf)$RC # extract SR from geno(svaba_vcf)
+head(RC)
+
+# assigning SR from GT to INFO of svaba_vcf
+info(delly_vcf)$RC=RC
+head(info(delly_vcf))
+
+# again, we need to trust that the row names / call ID matches
+# between the two data sets
+# and we confirm it:
+rownames(RC) == rownames(info(delly_vcf))
+rm(RC) # remove intermediate file
+```
+
+
+```{r}
+# check that RC is now in info(delly_vcf)
+head(info(delly_vcf))
+```
+
+
+You can pull any variables from INFO into the resulting breakpointRanges object using "info_columns"
+```{r create delly.bpr and delly.bpr.SRPE (Both svgr objects)}
+delly.bpr.SRPE=breakpointRanges(delly_vcf, info_columns=c("SR", "PE", "RC"))
+#delly.bpr=breakpointRanges(delly_vcf)
+#head(delly.bpr) ## without SR & PE columns
+head(delly.bpr.SRPE) ## with SR & PE columns, multi NA
+```
+
+
+### Assign a column for caller name
+```{r Assign $Caller Delly}
+delly.bpr.SRPE$Caller="Delly"
+```
+
+
+### Need to filter out the variants that pass
+```{r Delly filter}
+delly.bpr.SRPE=delly.bpr.SRPE[which(delly.bpr.SRPE$FILTER=="PASS")]
+```
+
+
+
+## SvABA: SR, DR, AD
+
+- 1. Need to delete the columns with no header (Script 1)
+- 2. Need to run the svaba_annotate_script.R (Script 2) (change the annotations for svaba from BND to DUP/INS etc)
+
+```{r import svaba_vcf, warning=FALSE}
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+svaba_vcf <- readVcf("NA12878_small.svaba.vcf") ## header trimmed & BND converted 
+```
+
+
+See if you can insert the svaba_annotate_script here to reassign the svaba_vcf2$svtype.
+
+```{r Read in BND-converted svaba (csv) files, warning=FALSE}
+# Annotated svaba files were written into csv files
+# because I don't know how to convert it to vcf yet
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/SvABA_processing")
+
+#conv.svaba <- read.csv("svaba_converted.csv") %>% subset(select = -X)
+#med.conv.svaba <- read.csv("med_svaba_converted.csv") %>% subset(select = -X)
+small.conv.svaba <- read.csv("small_svaba_converted.csv") %>% subset(select = -X)
+```
+
+^You can load the file separately and save SVTYPE as a new variable or to file
+
+```{r Extract and replace SV type from annotated file to svaba_vcf}
+# want to join $SV_type from small.conv.svaba to svaba.bpr based on call positions
+# original vcf: SV type stored in 
+# info(svaba_vcf)$SVTYPE
+# new converted file: stored in 
+# small.conv.svaba$SV_type
+
+# can play it safe and match the two by ID
+# or play risky by direct replacing and believe that 
+# the IDs were aligned exactly
+
+# note that we can extract breakend location
+# stored in fixed(svaba_vcf)$ALT
+# and compare it with small.conv.svaba$ALT
+
+info(svaba_vcf)$SVTYPE=small.conv.svaba$SV_type
+# double-checking
+head(info(svaba_vcf)$SVTYPE)
+# check if SV call aligns between the two sets
+svaba_vcf@fixed$ALT == small.conv.svaba$ALT
+```
+
+
+Note that the header of Svaba says:
+
+SR:
+
+> FORMAT=<ID=SR,Number=1,Type=Integer,Description="*Split-read support*">	
+
+AD:
+
+> FORMAT=<ID=AD,Number=1,Type=Integer,Description="*Allele depth*: Number of reads supporting the variant">
+
+DR:
+
+> FORMAT=<ID=*DR*,Number=1,Type=Integer,Description="Number of *discordant-supported reads* for this variant">							
+
+Notice that DR is different from PE:
+
+PE:
+
+> INFO=<ID=*PE*,Number=1,Type=Integer,Description="*Paired-end* support of the structural variant">
+
+
+
+This information is in **FORMAT** and NOT THE INFO column, 
+
+So we need to extract the supporting read info from the GT or genotype info, and save it to the INFO data frame:
+```{r Extract SR from geno(svaba)}
+head(geno(svaba_vcf)) # six columns
+SR=geno(svaba_vcf)$SR # extract SR from geno(svaba_vcf)
+head(SR)
+```
+
+Note that the resultant vector has row names automatically paired with call ID (location:pair) and the only entry is SR, i.e. number of spanning reads (or split-read support) for this variant.
+
+```{r Place SR in info(svaba)}
+# assigning SR from GT to INFO of svaba_vcf
+info(svaba_vcf)$SR=SR
+head(info(svaba_vcf))
+
+# again, we need to trust that the row names / call ID matches
+# between the two data sets
+# and we confirm it:
+rownames(SR) == rownames(info(svaba_vcf))
+```
+
+
+Now, do the same thing for the discordant reads!
+
+In Delly, PE were stored in INFO. Does SvABA use PE?
+
+```{r extract DR from geno(svaba)}
+head(geno(svaba_vcf)) # six columns
+#head(info(svaba_vcf)) # is PE here? No.
+DR=geno(svaba_vcf)$DR # extract DR from geno(svaba_vcf)
+head(DR)
+```
+
+```{r place DR in info(svaba)}
+# assigning DR from GT to INFO of svaba_vcf
+info(svaba_vcf)$DR=DR
+head(info(svaba_vcf)) # checking
+
+# again, we need to trust that the row names / call ID matches
+# between the two data sets
+# and we confirm it:
+rownames(DR) == rownames(info(svaba_vcf))
+```
+
+
+```{r extract & import AD from geno(svaba) to info(svaba)}
+# AD = depth at each site ?
+# extract AD
+head(geno(svaba_vcf)) # six columns
+AD=geno(svaba_vcf)$AD # extract AD from geno(svaba_vcf)
+head(AD)
+# place AD
+# assigning AD from GT to INFO of svaba_vcf
+info(svaba_vcf)$AD=AD
+head(info(svaba_vcf)) # checking
+
+# again, we need to trust that the row names / call ID matches
+# between the two data sets
+# and we confirm it:
+rownames(AD) == rownames(info(svaba_vcf))
+```
+
+```{r removing intermediate vectors}
+rm(DR,SR,AD)
+```
+
+
+### Need to filter out the variants that pass
+```{r}
+svaba.bpr.SRDR=svaba.bpr.SRDR[which(svaba.bpr.SRDR$FILTER=="PASS")]
+```
+
+
+
+## Manta: PR, SR, BND_DEPTH
+
+PR:
+
+> FORMAT=<ID=PR,Number=.,Type=Integer,Description="*Spanning paired-read support* for the ref and alt alleles in the order listed">
+
+SR:
+
+> FORMAT=<ID=SR,Number=.,Type=Integer,Description="*Split reads* for the ref and alt alleles in the order listed, for reads where P(allele|read)>0.999">
+
+BND_DEPTH:
+
+> INFO=<ID=BND_DEPTH,Number=1,Type=Integer,Description="*Read depth at local translocation breakend*">
+
+
+```{r Importing support read infos from Manta vcf}
+# read in vcf
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+manta_vcf<-readVcf("NA12878_small.manta.vcf")
+head(manta_vcf)
+# find PR?, SR, BND_DEPTH
+colnames(info(manta_vcf))
+colnames(geno(manta_vcf))
+# PR, SR are in GT; BND_DEPTH is in INFO
+# Splice PR, SR into INFO
+info(manta_vcf)$PR=geno(manta_vcf)$PR ## does PR=PE? what are they?
+info(manta_vcf)$SR=geno(manta_vcf)$SR
+# check rowname ID matches
+rownames(geno(manta_vcf)$PR) == rownames(info(manta_vcf))
+rownames(geno(manta_vcf)$SR) == rownames(info(manta_vcf))
+
+# generate svgr (breakpointRanges)
+# don't forget BND_DEPTH in INFO
+manta.bpr=breakpointRanges(manta_vcf, info_columns=c("PR", "SR", "BND_DEPTH"))
+head(manta.bpr) # BND_DEPTH has lots of NAs originally
+
+# assign caller
+manta.bpr$Caller="Manta"
+
+# filter
+manta.bpr=manta.bpr[which(manta.bpr$FILTER=="PASS")]
+```
+
+
+## Wham: SP, SR
+
+From geno(wham_vcf):
+
+> DP	1	Integer	Read Depth
+
+We noticed that DP has all NA in wham_vcf. We skip this stat.
+
+> SP	1	Integer	Per sample SV support
+
+> SR: "Number of split-reads supporting SV"
+
+```{r Importing support read infos from Wham vcf}
+# read in vcf
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+wham_vcf<-readVcf("NA12878_small.wham.vcf")
+head(wham_vcf)
+# find SP, SR
+colnames(info(wham_vcf)) ## only SR
+colnames(geno(wham_vcf)) ## gives NULL !? but they're there...
+head(geno(wham_vcf)) ## 3 columns
+# extract support read info
+info(wham_vcf)$SP=geno(wham_vcf)$SP
+# check rowname ID matches
+rownames(geno(wham_vcf)$SP) == rownames(info(wham_vcf))
+
+# generate svgr (breakpointRanges)
+# don't forget SR in INFO
+wham.bpr=breakpointRanges(wham_vcf, info_columns=c("SP", "SR"))
+head(wham.bpr) # BND_DEPTH has lots of NAs originally
+
+# assign caller
+wham.bpr$Caller="Wham"
+
+# filter
+wham.bpr=wham.bpr[which(wham.bpr$FILTER=="PASS")]
+```
+
+
+## Melt: LP, RP
+
+> LP: "Total number of *discordant pairs* supporting the *left side of the breakpoint*"
+
+> RP: "Total number of *discordant pairs* supporting the *right side of the breakpoint*"
+
+```{r Importing support read infos from Melt vcf}
+# read in vcf
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+melt_vcf<-readVcf("NA12878_small.melt.vcf")
+head(melt_vcf)
+# find LP, RP
+colnames(info(melt_vcf)) ## LP, RP
+
+# since LP RP are in INFO already, we can directly import to svgr by
+melt.bpr=breakpointRanges(melt_vcf, info_columns=c("LP", "RP"))
+head(melt.bpr) # BND_DEPTH has lots of NAs originally
+
+# assign caller
+melt.bpr$Caller="Melt"
+
+# filter
+melt.bpr=melt.bpr[which(melt.bpr$FILTER=="PASS")]
+```
+
+
+
+# 3. Find overlaps between callers
+
+## Find overlaps between delly and svaba and map these to the delly file:
+
+```{r augment svaba svgr with the new SR/DR info stored in its vcf, warning=FALSE}
+# there is a warning (a very long one) regarding chrM
+svaba.bpr.SRDR=breakpointRanges(svaba_vcf) ## update svgr
+svaba.bpr.SRDR$Caller="SvABA" ## assign caller
+```
+
+
+```{r}
+# count bp overlaps between delly and svaba
+delly.bpr.SRPE$svabamatch=countBreakpointOverlaps(delly.bpr.SRPE, svaba.bpr.SRDR, 
+                                              maxgap=100, sizemargin = 0.25, 
+                                              restrictMarginToSizeMultiple = 0.5, countOnlyBest=T)
+
+head(delly.bpr.SRPE) ## check updated svgr
+
+table(delly.bpr.SRPE$svabamatch) ## see how many calls from delly matched with svaba
+```
+
+
+## find overlaps between svaba and truth
+```{r}
+truth_personalis.bpr$svabamatch=countBreakpointOverlaps(truth_personalis.bpr, svaba.bpr.SRDR, 
+                                                        maxgap=100, sizemargin = 0.25,
+                                                        restrictMarginToSizeMultiple = 0.5, countOnlyBest=T)
+head(truth_personalis.bpr)
+table(truth_personalis.bpr$svabamatch)
+```
+
+
+We can also annotate the Delly svgr with which variants overlap with the truth set:
+```{r}
+delly.bpr.SRPE$truthmatch=countBreakpointOverlaps(delly.bpr.SRPE, truth_personalis.bpr, 
+                                                  maxgap=100, sizemargin = 0.25, 
+                                                  restrictMarginToSizeMultiple = 0.5, countOnlyBest=T)
+head(delly.bpr.SRPE)
+table(delly.bpr.SRPE$truthmatch)
+```
+
+
+Now, you can try to compare SR and PE for the samples which are matched to the truth set.
+
+e.g. In Delly, of those that matches the truth set, we want to see their support read info:
+```{r}
+summary(delly.bpr.SRPE$SR[which(delly.bpr.SRPE$truthmatch==1)])
+boxplot(delly.bpr.SRPE$SR[which(delly.bpr.SRPE$truthmatch==1)])
+```
+
+Similarly, for PE:
+```{r}
+summary(delly.bpr.SRPE$PE[which(delly.bpr.SRPE$truthmatch==1)])
+boxplot(delly.bpr.SRPE$PE[which(delly.bpr.SRPE$truthmatch==1)])
+```
+

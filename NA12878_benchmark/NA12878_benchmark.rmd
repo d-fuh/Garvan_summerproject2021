@@ -4,7 +4,7 @@ author:
   #David Fuh, <br/>
   #Summer Intern, <br/>
   #Garvan Institute of Medical Research, 
-  #Kinghorn Centre for Clinical Genomics, 
+  #Kinghorn Centre for Clinical Genomics, <br/>
   #Sydney, NSW, Australia
 date: "`r Sys.Date()`"
 output:
@@ -676,11 +676,16 @@ svaba_svgr$meltmatch <- countBreakpointOverlaps(svaba_svgr, melt_svgr,
 # consensus list: comparisons of comparisons
 # start largest, then small
 whamMantaDelly=wham_svgr[wham_svgr$mantamatch==1 & wham_svgr$dellymatch==1] ## n=1420
+# compare with the dplyr version
+whamMantaDelly = subset(wham_svgr, dellymatch==1 & mantamatch==1) ## also n=1420
 
 whamMantaDellySvaba=whamMantaDelly[whamMantaDelly$svabamatch==1] ## n=1070
 
 consensus=whamMantaDellySvaba[whamMantaDellySvaba$meltmatch==1] ## n=0 (!)
 ## does order matter here? why?
+consensus = subset(whamMantaDellySvaba, meltmatch==1) ## n=0
+
+consensus = subset(wham_svgr, mantamatch==1 & dellymatch==1 & meltmatch==1 & svabamatch==1) ## still n=0
 ```
 
 

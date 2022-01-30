@@ -1,11 +1,13 @@
 # Read in svaba vcf file
 library(dplyr)
+# This is the svaba file with redundant headers trimmed
+# Use SvABA_header_trimmer.R if not
+svaba.vcf="~/Documents/GitHub/summerproject2021/NA12878_benchmark/SvABA_processing/NA12878_small.svaba.vcf"
 
-svaba.sv.vcf="~/Documents/GitHub/summerproject2021/NA12878_benchmark/SvABA_processing/NA12878.svaba.vcf"
-
-cols <- colnames(read.table(pipe(paste0('grep -v "##" ', svaba.sv.vcf,' | grep "#"| sed s/#//')), header = TRUE))
+cols <- colnames(read.table(pipe(paste0('grep -v "##" ', svaba.vcf,' | grep "#"| sed s/#//')), header = TRUE))
 cols <- sapply(cols, function(x) gsub("(mrkdp\\.)|(\\.bam)", "", x))
-svaba_uniq <- read.table(svaba.sv.vcf, col.names = cols, stringsAsFactors = FALSE)
+
+svaba_uniq <- read.table(svaba.vcf, col.names = cols, stringsAsFactors = FALSE)
 
 get_sv_type <- function(x){
   # Find mate pair
@@ -29,6 +31,7 @@ get_sv_type <- function(x){
   }
   return(sv_type)
 }
-svaba_uniq$SV_type <- sapply(svaba_uniq$ID, get_sv_type)
 
-write.csv(svaba_uniq, "svaba.uniq.csv")
+svaba_uniq$SV_type <- sapply(svaba_uniq$ID, get_sv_type)
+# write to new vcf
+write.table(svaba_uniq, "svaba_converted.vcf")
