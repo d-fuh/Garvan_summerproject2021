@@ -18,45 +18,45 @@ truth_svgr <- breakpointRanges(truth_vcf)
 # 50pc set
 # original Dropbox file were compressed
 # below files were decompressed
-delly_vcf <- readVcf("NA12878_50pc_sampled.delly.vcf", "hg38")
-manta_vcf <- readVcf("NA12878_50pc_sampled.manta.vcf", "hg38")
-melt_vcf <- readVcf("NA12878_50pc_sampled.melt.vcf", "hg38")
-wham_vcf <- readVcf("NA12878_50pc_sampled.wham.vcf", "hg38")
-svaba_vcf <- readVcf("NA12878_50pc_sampled.svaba.vcf", "hg38") ## processed, converted file in folder
+ft_delly_vcf <- readVcf("NA12878_50pc_sampled.delly.vcf", "hg38")
+ft_manta_vcf <- readVcf("NA12878_50pc_sampled.manta.vcf", "hg38")
+ft_melt_vcf <- readVcf("NA12878_50pc_sampled.melt.vcf", "hg38")
+ft_wham_vcf <- readVcf("NA12878_50pc_sampled.wham.vcf", "hg38")
+ft_svaba_vcf <- readVcf("NA12878_50pc_sampled.svaba.vcf", "hg38") ## processed, converted file in folder
 
 
 # bpr or svgr
-delly_svgr <- breakpointRanges(delly_vcf)
-manta_svgr <- breakpointRanges(manta_vcf)
-melt_svgr <- breakpointRanges(melt_vcf)
-wham_svgr <- breakpointRanges(wham_vcf)
-svaba_svgr <- breakpointRanges(svaba_vcf)
+ft_delly_svgr <- breakpointRanges(ft_delly_vcf)
+ft_manta_svgr <- breakpointRanges(ft_manta_vcf)
+ft_melt_svgr <- breakpointRanges(ft_melt_vcf)
+ft_wham_svgr <- breakpointRanges(ft_wham_vcf)
+ft_svaba_svgr <- breakpointRanges(ft_svaba_vcf)
 
 # filter
-delly_svgr=subset(delly_svgr, delly_svgr@elementMetadata[, 5] == "PASS") 
-manta_svgr=subset(manta_svgr, manta_svgr@elementMetadata[, 5] == "PASS") 
-melt_svgr=subset(melt_svgr, melt_svgr@elementMetadata[, 5] == "PASS") 
-wham_svgr=subset(wham_svgr, wham_svgr@elementMetadata[, 5] == "PASS") 
-svaba_svgr=subset(svaba_svgr, svaba_svgr@elementMetadata[, 5] == "PASS") 
+ft_delly_svgr=subset(ft_delly_svgr, ft_delly_svgr@elementMetadata[, 5] == "PASS") 
+ft_manta_svgr=subset(ft_manta_svgr, ft_manta_svgr@elementMetadata[, 5] == "PASS") 
+ft_melt_svgr=subset(ft_melt_svgr, ft_melt_svgr@elementMetadata[, 5] == "PASS") 
+ft_wham_svgr=subset(ft_wham_svgr, ft_wham_svgr@elementMetadata[, 5] == "PASS") 
+ft_svaba_svgr=subset(ft_svaba_svgr, ft_svaba_svgr@elementMetadata[, 5] == "PASS") 
 
 # assign caller info
-delly_svgr$Caller <- "Delly"
-manta_svgr$Caller <- "Manta"
-melt_svgr$Caller <- "Melt"
-wham_svgr$Caller <- "Wham"
-svaba_svgr$Caller <- "SvABA"
+ft_delly_svgr$Caller <- "Delly"
+ft_manta_svgr$Caller <- "Manta"
+ft_melt_svgr$Caller <- "Melt"
+ft_wham_svgr$Caller <- "Wham"
+ft_svaba_svgr$Caller <- "SvABA"
 
 # assign coverage info
-delly_svgr$Cov <- "50pc"
-manta_svgr$Cov <- "50pc"
-melt_svgr$Cov <- "50pc"
-wham_svgr$Cov <- "50pc"
-svaba_svgr$Cov <- "50pc"
+ft_delly_svgr$Cov <- "18X"
+ft_manta_svgr$Cov <- "18X"
+ft_melt_svgr$Cov <- "18X"
+ft_wham_svgr$Cov <- "18X"
+ft_svaba_svgr$Cov <- "18X"
 
 # main svgr
-svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
+ft_svgr <- c(ft_delly_svgr, ft_manta_svgr, ft_melt_svgr, ft_wham_svgr, ft_svaba_svgr)
 
-svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr, 
+ft_svgr$truth_matches <- countBreakpointOverlaps(ft_svgr, truth_svgr, 
                                               
                                               maxgap=100, sizemargin=0.25, ## explain
                                               
@@ -64,7 +64,7 @@ svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
                                               
                                               countOnlyBest=TRUE)
 # get summary stats
-fiftypc = as.data.frame(svgr) %>%
+fiftypc = as.data.frame(ft_svgr) %>%
   dplyr::select(Caller, truth_matches) %>%
   dplyr::group_by(Caller) %>%
   dplyr::summarise(
@@ -81,7 +81,7 @@ fiftypc = as.data.frame(svgr) %>%
     Precision=cum_tp / cum_n,
     Recall=cum_tp/length(truth_svgr)
   )
-fiftypc$Cov <- "50pc"
+fiftypc$Cov <- "18X"
 
 # plot
 ggplot(fiftypc) +

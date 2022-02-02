@@ -189,7 +189,7 @@ small_svaba_svgr$Cov <- "Small"
 truth_svgr <- breakpointRanges(truth_vcf)
 ```
 
-```{r Precision X Recall plot <ORIGINAL>}
+```{r Precision X Recall plot <ORIGINAL>, eval=FALSE}
 # Delineate each term
 svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
 
@@ -244,12 +244,12 @@ aes(x=Recall, y=Precision, colour=Caller) +
   labs(title="Delly/Manta/Melt/Wham/SvABA SV calls vs Truth Set \n (NA12878; Personalis & Spiral)")
 ```
 
-```{r svgr med_svgr small_svgr generation, warning=FALSE}
-svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
+```{r svgr med_svgr small_svgr generation, warning=FALSE, eval=FALSE}
+large_svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
 med_svgr <- c(med_delly_svgr, med_manta_svgr, med_melt_svgr, med_wham_svgr, med_svaba_svgr)
 small_svgr <- c(small_delly_svgr, small_manta_svgr, small_melt_svgr, small_wham_svgr, small_svaba_svgr)
 
-svgr$truth_matches <- countBreakpointOverlaps(svgr, truth_svgr,
+large_svgr$truth_matches <- countBreakpointOverlaps(large_svgr, truth_svgr,
                                               maxgap=100, sizemargin=0.25, 
                                               restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
 
@@ -264,7 +264,98 @@ small_svgr$truth_matches <- countBreakpointOverlaps(small_svgr, truth_svgr,
 #ALL_svgr <- c(svgr, med_svgr, small_svgr)
 ```
 
-```{r USE precision recall plot <ORIGINAL>}
+
+Does this differ from the above:
+```{r warning=FALSE}
+# large
+delly_svgr$truth_matches <- countBreakpointOverlaps(delly_svgr, 
+                                              truth_svgr, 
+                                              maxgap=100, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+manta_svgr$truth_matches <- countBreakpointOverlaps(manta_svgr, 
+                                              truth_svgr, 
+                                              maxgap=100, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+melt_svgr$truth_matches <- countBreakpointOverlaps(melt_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+wham_svgr$truth_matches <- countBreakpointOverlaps(wham_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+svaba_svgr$truth_matches <- countBreakpointOverlaps(svaba_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+large_svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
+
+# medium
+med_delly_svgr$truth_matches <- countBreakpointOverlaps(med_delly_svgr, 
+                                              truth_svgr, 
+                                              maxgap=100, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+med_manta_svgr$truth_matches <- countBreakpointOverlaps(med_manta_svgr, 
+                                              truth_svgr, 
+                                              maxgap=100, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+med_melt_svgr$truth_matches <- countBreakpointOverlaps(med_melt_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+med_wham_svgr$truth_matches <- countBreakpointOverlaps(med_wham_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+med_svaba_svgr$truth_matches <- countBreakpointOverlaps(med_svaba_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+med_svgr <- c(med_delly_svgr, med_manta_svgr, med_melt_svgr, med_wham_svgr, med_svaba_svgr)
+
+# small
+small_delly_svgr$truth_matches <- countBreakpointOverlaps(small_delly_svgr, 
+                                              truth_svgr, 
+                                              maxgap=100, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+small_manta_svgr$truth_matches <- countBreakpointOverlaps(small_manta_svgr, 
+                                              truth_svgr, 
+                                              maxgap=100, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+small_melt_svgr$truth_matches <- countBreakpointOverlaps(small_melt_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+small_wham_svgr$truth_matches <- countBreakpointOverlaps(small_wham_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+small_svaba_svgr$truth_matches <- countBreakpointOverlaps(small_svaba_svgr, 
+                                             truth_svgr, 
+                                             maxgap=100, sizemargin=0.25,
+                                             restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+small_svgr <- c(small_delly_svgr, small_manta_svgr, small_melt_svgr, small_wham_svgr, small_svaba_svgr)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r USE precision recall plot <ORIGINAL>, eval=FALSE}
 # indiv. version
 
 # delly: RP + SR
@@ -350,7 +441,7 @@ ggplot() +
 ```
 
 
-```{r USE precision recall plot <SUBSET BAR>}
+```{r USE precision recall plot <SUBSET BAR>, eval=FALSE}
 # indiv. version
 # plot
 ## count of breakpoint overlap (0, 1, 2) in each NA12878 sample vs the truth set 
@@ -381,7 +472,7 @@ grid.arrange(L1, M1, S1, nrow=1)
 ```
 
 
-```{r USE precision recall plot <SUBSET POINTS>}
+```{r USE precision recall plot <SUBSET POINTS>, eval=FALSE}
 ## recall rate
 as.data.frame(svgr) %>%
          
@@ -494,7 +585,7 @@ PR <- data.frame()
 # Recall rate for each caller, and for each coverage
 
 ## large
-PR_large = as.data.frame(svgr) %>%
+PR_large = as.data.frame(large_svgr) %>%
          
          dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
   
@@ -520,7 +611,7 @@ PR_large = as.data.frame(svgr) %>%
     
       Recall=cum_tp/length(truth_svgr)
       )
-PR_large$Cov <- "Large"
+PR_large$Cov <- "35X"
 
 ## medium
 PR_medium = as.data.frame(med_svgr) %>%
@@ -540,7 +631,7 @@ PR_medium = as.data.frame(med_svgr) %>%
       Precision=cum_tp / cum_n,
       Recall=cum_tp/length(truth_svgr)
       )
-PR_medium$Cov <- "Medium"
+PR_medium$Cov <- "6X"
 
 ## small
 PR_small = as.data.frame(small_svgr) %>%
@@ -560,10 +651,17 @@ PR_small = as.data.frame(small_svgr) %>%
       Precision=cum_tp / cum_n,
       Recall=cum_tp/length(truth_svgr)
       )
-PR_small$Cov <- "Small"
+PR_small$Cov <- "1X"
 
 # full join
 PR <- plyr::join(PR_large, PR_medium, type = "full") %>% plyr::join(., PR_small, type = "full")
+
+# to include the 50pc set
+# use the NA12878_benchmark.R
+PR=plyr::join(PR, fiftypc, type="full")
+
+# reorder panel header level for plot later
+PR$Cov <- factor(PR$Cov, levels = c("35X", "18X", "6X", "1X"))
 ```
 
 ```{r}
@@ -577,7 +675,7 @@ ggplot(PR) +
 ```
 
 
-```{r}
+```{r eval=FALSE}
 # want to know more about the non-zero recalls in NA12878 small subset
 # to do that, we need support read info
 # use the script "Add_support_read_info.R"
@@ -627,7 +725,7 @@ dXm <- delly_svgr[delly_svgr$mantamatch==1] ## reads: "of those calls who matche
 The resultant subset (a GR) can be used for many purposes.
 
 
-```{r Ten pairwise comparisons}
+```{r Ten pairwise comparisons, eval=FALSE}
 # we will use consistent criteria for breakpoint resolution as before
 
 # we will do all 10 pair-wise comparisons together
@@ -682,7 +780,7 @@ svaba_svgr$meltmatch <- countBreakpointOverlaps(svaba_svgr, melt_svgr,
 ```
 
 
-```{r Consensus list}
+```{r Consensus list, eval=FALSE}
 # consensus list: comparisons of comparisons
 # start largest, then small
 whamMantaDelly=wham_svgr[wham_svgr$mantamatch==1 & wham_svgr$dellymatch==1] ## n=1420
@@ -699,7 +797,7 @@ consensus = subset(wham_svgr, mantamatch==1 & dellymatch==1 & meltmatch==1 & sva
 ```
 
 
-```{r Annotate with caller number}
+```{r Annotate with caller number, eval=FALSE}
 # explain whether the following approach is valid or not and why:
 svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
 
