@@ -60,7 +60,7 @@ truth_vcf <- rbind(personalis_vcf, spiral_vcf)
 # Benchmarking against the truth set
 
 ## BreakpointRanges
-```{r caller_svgr generation}
+```{r caller_svgr generation, warning=FALSE}
 setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
 # full-sized
 delly_vcf <- readVcf("NA12878.delly.vcf", "hg38")
@@ -136,7 +136,7 @@ small_svaba_svgr=subset(small_svaba_svgr, small_svaba_svgr@elementMetadata[, 5] 
 ```
 
 ## Caller
-```{r Assigning callers to svgr}
+```{r Assigning callers to svgr, warning=FALSE}
 # assign caller info
 delly_svgr$Caller <- "Delly"
 manta_svgr$Caller <- "Manta"
@@ -160,7 +160,7 @@ small_svaba_svgr$Caller <- "SvABA"
 ```
 
 ## Coverage
-```{r Assigning coverage to svgr}
+```{r Assigning coverage to svgr, warning=FALSE}
 # assign coverage info
 delly_svgr$Cov <- "Large"
 manta_svgr$Cov <- "Large"
@@ -244,7 +244,7 @@ aes(x=Recall, y=Precision, colour=Caller) +
   labs(title="Delly/Manta/Melt/Wham/SvABA SV calls vs Truth Set \n (NA12878; Personalis & Spiral)")
 ```
 
-```{r svgr med_svgr small_svgr generation}
+```{r svgr med_svgr small_svgr generation, warning=FALSE}
 svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
 med_svgr <- c(med_delly_svgr, med_manta_svgr, med_melt_svgr, med_wham_svgr, med_svaba_svgr)
 small_svgr <- c(small_delly_svgr, small_manta_svgr, small_melt_svgr, small_wham_svgr, small_svaba_svgr)
@@ -261,7 +261,7 @@ small_svgr$truth_matches <- countBreakpointOverlaps(small_svgr, truth_svgr,
                                                     maxgap=100, sizemargin=0.25, 
                                                     restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
 
-ALL_svgr <- c(svgr, med_svgr, small_svgr)
+#ALL_svgr <- c(svgr, med_svgr, small_svgr)
 ```
 
 ```{r USE precision recall plot <ORIGINAL>}
@@ -487,14 +487,14 @@ L2 + M2 + S2
 ```{r Synthesis of three cov levels P/R}
 # extract the numeric info instead to simplify things
 # we need a new data frame
-test <- data.frame()
+PR <- data.frame()
 # extract the key variables
 # we need:
 # Precision for each caller, for each coverage level
 # Recall rate for each caller, and for each coverage
 
 ## large
-test_large = as.data.frame(svgr) %>%
+PR_large = as.data.frame(svgr) %>%
          
          dplyr::select(Caller, truth_matches) %>% ## QUAL mostly 0 & NA --- excluded
   
@@ -520,10 +520,10 @@ test_large = as.data.frame(svgr) %>%
     
       Recall=cum_tp/length(truth_svgr)
       )
-test_large$Cov <- "Large"
+PR_large$Cov <- "Large"
 
 ## medium
-test_medium = as.data.frame(med_svgr) %>%
+PR_medium = as.data.frame(med_svgr) %>%
          dplyr::select(Caller, truth_matches) %>%
          dplyr::group_by(Caller) %>%
     dplyr::summarise(
@@ -540,10 +540,10 @@ test_medium = as.data.frame(med_svgr) %>%
       Precision=cum_tp / cum_n,
       Recall=cum_tp/length(truth_svgr)
       )
-test_medium$Cov <- "Medium"
+PR_medium$Cov <- "Medium"
 
 ## small
-test_small = as.data.frame(small_svgr) %>%
+PR_small = as.data.frame(small_svgr) %>%
          dplyr::select(Caller, truth_matches) %>%
          dplyr::group_by(Caller) %>%
     dplyr::summarise(
@@ -560,19 +560,20 @@ test_small = as.data.frame(small_svgr) %>%
       Precision=cum_tp / cum_n,
       Recall=cum_tp/length(truth_svgr)
       )
-test_small$Cov <- "Small"
+PR_small$Cov <- "Small"
 
 # full join
-test <- plyr::join(test_large, test_medium, type = "full") %>% plyr::join(., test_small, type = "full")
+PR <- plyr::join(PR_large, PR_medium, type = "full") %>% plyr::join(., PR_small, type = "full")
 ```
 
 ```{r}
 # plot
-ggplot(test) +
-  geom_point(aes(x=Caller, y=Precision)) +
+ggplot(PR) +
   geom_point(aes(x=Caller, y=Recall), shape=25, fill="red", size=2.5) +
-  facet_wrap(~Cov) +
-  ylab("Precision (black dot) & Recall (Red triangle)")
+  geom_point(aes(x=Caller, y=Precision), shape=3, size=2.7) +
+  facet_wrap(~Cov, nrow=1) +
+  theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2)) + 
+  ylab("Precision (cross) & Recall (red triangle)")
 ```
 
 
