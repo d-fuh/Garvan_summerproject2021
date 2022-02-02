@@ -9,7 +9,7 @@ setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
 # |Caller|Stats used         |
 # |:-----|:------------------|
 # |Delly |SR, PE, RC         |
-# |SvABA |SR, DR, AD         |DP=NA
+# |SvABA |SR, DR, AD         |DP=total depth
 # |Manta |SR, PR, BND_DEPTH  |
 # |Wham  |SR, SP             |DP=NA
 # |Melt  |LP, RP             |
@@ -49,7 +49,7 @@ svaba_vcf<-readVcf("NA12878_small.svaba.vcf")
 
 # original svaba vcf has $SVTYPE == "BND" for all calls
 # used a script to convert them into normal SV_type
-# and written into svaba.uniq.csv files
+# and written into svaba_converted.csv files
 small.conv.svaba <- read.csv("small_svaba_converted.csv") %>% subset(select = -X)
 info(svaba_vcf)$SVTYPE=small.conv.svaba$SV_type ## double check the ALT column matches
     #svaba_vcf@fixed$ALT == small.conv.svaba$ALT

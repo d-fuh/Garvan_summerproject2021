@@ -708,7 +708,7 @@ svgr$mantamatch ## looks normal
 
 # if a variant call is called by k out of the five callers,
 # let a new column $numCallers = k for that row
-svgr$numCallers=
+svgr$numCallers
 ```
 
 
@@ -719,7 +719,7 @@ One way of visualising paired breakpoints is by circos plots.
 
 Here, we use the plotting package ggbio which provides flexible track functions which bind with ggplot2 objects. It takes GRanges objects as input and supports circos plots. To plot structural variant breakpoints in a circos plot using ggbio, we need to first prepare the breakpoint GRanges. The function requires a special column, indicating the end of the link using GRanges format.
 
-```{r circos setup subset}
+```{r circos setup subset, eval=FALSE, include=FALSE}
 # test on subset first as the original took very long
 setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
 
@@ -751,7 +751,7 @@ ggbio() +
 
 
 ### use package "circlize"
-```{r}
+```{r, eval=FALSE, include=FALSE}
 library(circlize)
 # extract chr end points
 chrRanges=head(as.vector(biovizBase::ideo@ranges), n=24)

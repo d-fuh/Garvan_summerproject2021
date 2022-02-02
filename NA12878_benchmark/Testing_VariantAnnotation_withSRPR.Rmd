@@ -23,7 +23,7 @@ truth_personalis.bpr=breakpointRanges(truth_personalis)
 |Caller|Stats used         |Waiting list  |Currently unconsidered variables|
 |:-----|:------------------|:------------:|:------------------------------:|
 |Delly |SR, PE, RC         |              |                                |
-|SvABA |SR, DR, AD         |DP=NA         |                                |
+|SvABA |SR, DR, AD         |DP=total depth|                                |
 |Manta |SR, PR, BND_DEPTH  |              |                                |
 |Wham  |SR, SP             |DP=NA         |D, I, SS?, T                    |
 |Melt  |LP, RP             |              |RA?                             |
@@ -106,6 +106,8 @@ RC:
 - PE=16 means 
 - SR=7 means
 - RC=5613479 means
+
+RC "looks too high" so we will omit this stat instead.
 
 Note that SR also comes with SRQ (quality measure) and PE comes with MAPQ but these are not extracted.
 
@@ -441,8 +443,9 @@ table(delly.bpr$svabamatch) ## see how many calls from delly matched with svaba
 ```
 
 
-## find overlaps between svaba and truth
-```{r}
+## Svaba/Delly and truth_personalis
+
+```{r Svaba truthmatch}
 truth_personalis.bpr$svabamatch=countBreakpointOverlaps(truth_personalis.bpr, svaba.bpr, 
                                                         maxgap=100, sizemargin = 0.25,
                                                         restrictMarginToSizeMultiple = 0.5, countOnlyBest=T)
@@ -452,7 +455,7 @@ table(truth_personalis.bpr$svabamatch)
 
 
 We can also annotate the Delly svgr with which variants overlap with the truth set:
-```{r}
+```{r Delly truthmatch}
 delly.bpr$truthmatch=countBreakpointOverlaps(delly.bpr, truth_personalis.bpr, 
                                                   maxgap=100, sizemargin = 0.25, 
                                                   restrictMarginToSizeMultiple = 0.5, countOnlyBest=T)
@@ -464,14 +467,92 @@ table(delly.bpr$truthmatch)
 Now, you can try to compare SR and PE for the samples which are matched to the truth set.
 
 e.g. In Delly, of those that matches the truth set, we want to see their support read info:
-```{r}
+```{r Summary delly truthmatch 1}
 summary(delly.bpr$SR[which(delly.bpr$truthmatch==1)])
 boxplot(delly.bpr$SR[which(delly.bpr$truthmatch==1)])
 ```
 
 Similarly, for PE:
-```{r}
+```{r Boxplot delly PE w/ truthmatch 1}
 summary(delly.bpr$PE[which(delly.bpr$truthmatch==1)])
 boxplot(delly.bpr$PE[which(delly.bpr$truthmatch==1)])
+```
+
+```{r Boxplot delly PR~truthmatch}
+# No NA in delly.bpr$truthmatch, only {0, 1}
+# PE: No NA either
+boxplot(delly.bpr$PE~delly.bpr$truthmatch)
+```
+
+## SR stats distribution between callers
+
+```{r Boxplot SR~Caller}
+# Melt has only LP/RP stat
+# so we need to convert it to an SR representative
+# by letting melt.bpr$SR=(LP+RP)/2 ## need to double-check validity of this formula
+melt.bpr$SR=(melt.bpr$LP+melt.bpr$RP)/2
+
+# want to see in a concatenated object,
+support.svgr = c(delly.bpr, manta.bpr, svaba.bpr, melt.bpr, wham.bpr)
+
+# ... filter(truthmatch > 0) %>% boxplot(SR ~ Caller, fill=Caller)
+svgr.match=support.svgr[which(support.svgr$truthmatch>0)]
+
+boxplot(support.svgr$SR ~ support.svgr$Caller)
+```
+
+Why is Manta missing?
+
+
+4. Combined PE + SR score
+
+A new paradigm is proposed for the imported support stats:
+
+|Caller|Original stats used|"Combined PE+SR score" | Note                 |
+|:-----|:------------------|:---------------------:|:---------------------|
+|Delly |SR, PE, RC         | DR                    |                      |
+|SvABA |SR, DR, AD         | AD                    | DP=total depth       |
+|Manta |SR, PR, BND_DEPTH  | SR+ 1/2PR?            | SR lists both the alt & ref so you need to split it  |
+|Wham  |SR, SP             | A                     |                      |
+|Melt  |LP, RP             | LP + RP?              |                      |
+
+```{r Combined PE+SR score}
+# start from the VCF level
+# then convert to bpr again
+
+# import DR stat to Delly
+# it's hidden in the GT FORMAT rows
+info(delly_vcf)$DR=geno(delly_vcf)$DR
+
+# get new stat = SR+1/2PR for Manta
+# for convenience I will call it DR
+# but I don't know if this is valid
+
+# note that both columns in caller_vcf
+# are "lists"
+# so to perform arithmetic on them
+# we need to unlist first
+# and then coerce
+
+# AND that in Manta,
+# SR is recorded as a 2-tuple that contains
+# "Split reads for the ref and alt alleles in the order listed"
+
+# so we need to split it. How exactly?
+
+# first let's see what happens when we add the 2-tuples together anyway
+# beware of the rownames order and the order of each tuple
+manta_DR=(
+  as.numeric(unlist(info(manta_vcf)$SR)) + 0.5*as.numeric(unlist(info(manta_vcf)$PR)))
+
+# import 'A' to Wham
+# it's already in INFO
+# so we will import during the bpr step
+
+# get new stat = LP+RP for Melt
+# again, for convenience I will name it DR
+# but I don't know what that means
+
+melt_vcf$DR=(melt_vcf$LP + melt_vcf$RP)
 ```
 
