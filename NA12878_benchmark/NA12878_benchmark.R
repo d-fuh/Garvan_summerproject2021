@@ -47,51 +47,51 @@ ft_wham_svgr$Caller <- "Wham"
 ft_svaba_svgr$Caller <- "SvABA"
 
 # assign coverage info
-ft_delly_svgr$Cov <- "18X"
-ft_manta_svgr$Cov <- "18X"
-ft_melt_svgr$Cov <- "18X"
-ft_wham_svgr$Cov <- "18X"
-ft_svaba_svgr$Cov <- "18X"
+ft_delly_svgr$Cov <- "18x"
+ft_manta_svgr$Cov <- "18x"
+ft_melt_svgr$Cov <- "18x"
+ft_wham_svgr$Cov <- "18x"
+ft_svaba_svgr$Cov <- "18x"
 
+
+
+
+# truth matches
+ft_delly_svgr$truth_matches <- countBreakpointOverlaps(ft_delly_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                          restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ft_manta_svgr$truth_matches <- countBreakpointOverlaps(ft_manta_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                          restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ft_melt_svgr$truth_matches <- countBreakpointOverlaps(ft_melt_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                         restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ft_wham_svgr$truth_matches <- countBreakpointOverlaps(ft_wham_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                         restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ft_svaba_svgr$truth_matches <- countBreakpointOverlaps(ft_svaba_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                          restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
 # main svgr
 ft_svgr <- c(ft_delly_svgr, ft_manta_svgr, ft_melt_svgr, ft_wham_svgr, ft_svaba_svgr)
 
-ft_svgr$truth_matches <- countBreakpointOverlaps(ft_svgr, truth_svgr, 
-                                              
-                                              maxgap=100, sizemargin=0.25, ## explain
-                                              
-                                              restrictMarginToSizeMultiple=0.5, ## explain
-                                              
-                                              countOnlyBest=TRUE)
 # get summary stats
-fiftypc = as.data.frame(ft_svgr) %>%
+PR_fiftypc = as.data.frame(ft_svgr) %>%
   dplyr::select(Caller, truth_matches) %>%
   dplyr::group_by(Caller) %>%
   dplyr::summarise(
     calls=dplyr::n(), ## number of calls for each caller that matches the truth
     tp=sum(truth_matches > 0)) %>% ## tp=true positive calls for each caller = sum(all non-0 tp calls for each caller)
   
-  dplyr::group_by(Caller) %>%
-  
   dplyr::mutate(
-    cum_tp=cumsum(tp),
-    cum_n=cumsum(calls),
-    cum_fp=cum_n - cum_tp,
-    
-    Precision=cum_tp / cum_n,
-    Recall=cum_tp/length(truth_svgr)
+    fp=calls-tp,
+    Precision=tp/calls,
+    Recall=tp/length(truth_svgr)
   )
-fiftypc$Cov <- "18X"
+
+PR_fiftypc$Cov <- "18x"
 
 # plot
-ggplot(fiftypc) +
+ggplot(PR_fiftypc) +
   geom_point(aes(x=Caller, y=Recall), shape=25, fill="red", size=2.5) +
   geom_point(aes(x=Caller, y=Precision), shape=3, size=3) +
   facet_wrap(~Cov) +
   ylab("Precision (cross) & Recall (Red triangle)")
-
-
-
 
 
 
