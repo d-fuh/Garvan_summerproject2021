@@ -16,6 +16,9 @@ See Slack for details
 ^[TODO] Formulate that conclusion (Our theme).
 
 - Once formulated, we use that as a "guide" to our ExRes analysis:
+- Check (approx.) the overall depth of the ExRes readings
+> Should be well over 30 for most. ~35x holds (Large)
+> Some are like 40 something. Some ~35x.
 
 - [TODO] Pick e.g. Manta and SvABA calls from the 6 samples
 - [TODO] What variants were called?
