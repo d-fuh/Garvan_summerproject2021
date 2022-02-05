@@ -1,0 +1,56 @@
+---
+title: "SvABA output processing"
+output: html_notebook
+---
+Below is a script to remove the three redundant columns from SvABA workflow.
+
+# 1. Use Bash to rename the columns of interest
+```{bash}
+# copy the line after "FORMAT"
+# /cromwell_root/.../sample_name.bam
+grep "#CHROM" ER118_MEL6N.svaba.sv.vcf
+```
+
+
+```{bash}
+# cat sample_name.sv.vcf | 
+# ... tFORMAT\t/***PASTE HERE***...../(including) sample_name.bam"
+# change tA\tB\tC\t***sample_name*** > sample_name.sv(.new).vcf
+
+cat ER118_MEL6N.svaba.sv.vcf | awk '{gsub("FILTER\tINFO\tFORMAT\t/cromwell_root/er-wgs-samples/er_hg38/R_211008_ELEHAJ_EXCEPTIONALRESPONDERS_M001/ER0118N.bam", "FILTER\tINFO\tFORMAT\tA\tB\tC\tER118N")}1' > ER118_MEL6N.svaba.sv.new.vcf
+```
+
+File names: Below are Bash-renamed VCF files
+
+- NA12878_small.svaba.sv.new.vcf
+- NA12878_med.svaba.sv.new.vcf
+- NA12878.svaba.sv.new.vcf
+
+
+# 2. Use R to remove the redundant columns
+```{r}
+# columns have been renamed but not yet removed in the vcf file
+# load in
+library(vcfR)
+
+to.be.cleaned.vcf <- read.vcfR("ER118_MEL6N.svaba.sv.new.vcf")
+
+# remove the 3 redundant columns
+  #dim(to.be.cleaned.vcf@gt[, c(2:4)])
+to.be.cleaned.vcf@gt = to.be.cleaned.vcf@gt[, -c(2:4)]
+  #dim(to.be.cleaned.vcf@gt)
+
+# write the clean object to new vcf file
+write.vcf(to.be.cleaned.vcf, "ER118_MEL6N.svaba.vcf")
+```
+
+Even if the original input VCF was decompressed, the resultant file needs to be decompressed again!
+
+
+```{r}
+# test output file
+# should be able to load directly 
+# check total SV calls
+test.vcf <- read.vcfR("ER118_MEL6N.svaba.vcf")
+```
+

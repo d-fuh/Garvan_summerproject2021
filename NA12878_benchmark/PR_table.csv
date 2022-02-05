@@ -1,0 +1,9 @@
+,35x,,,,18x,,,,6x,,,,1x,,,
+Caller,Delly,Manta,SvABA,Wham,Delly,Manta,SvABA,Wham,Delly,Manta,SvABA,Wham,Delly,Manta,SvABA,Wham
+Precision,21%,36%,53%,24%,26%,48%,63%,31%,38%,44%,68%,33%,22%,34%,40%,18%
+Recall,31%,79%,56%,57%,26%,62%,46%,37%,11%,4%,13%,13%,1%,1%,2%,2%
+,,,,,,,,,,,,,,,,
+TRENDS:,,,,,,,,,,,,,,,,
+1. Precision: Trend presists regardless of coverage level; drops with decreasing coverage except at 6x where precision spiked for all groups (Possibly noise).,,,,,,,,,,,,,,,,
+"2. Recall: Manta gives highest recall in acceptable coverage level (35x). Remarkably, even at 18x coverage Manta maintained a 62% recall rate with 48% precision.",,,,,,,,,,,,,,,,
+"3. At 35x coverage, Manta has the best recall rate while SvABA gave the best Precision/Recall performance.",,,,,,,,,,,,,,,,

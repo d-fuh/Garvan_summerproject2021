@@ -5,6 +5,8 @@
 *.vcf.gz
 *.tsv.gz
 *.DS_Store
+*.pptx
+
 worknote.txt
 
 Germline/ExRes.csv

@@ -43,7 +43,21 @@ library(GenomicRanges)
 library(StructuralVariantAnnotation)
 ```
 
+
+# ExResID profile
+
+|:---ExRes ID----:|:----
+|   ER019_SAR1N   |
+|   ER052_MEL1N   |
+|   ER057_MEL2N   |
+|   ER095_MEL3N   |
+|   ER108_MEL5N   |
+|   ER118_MEL6N   |
+   
+
+
 # Importing annotated SV file (csv)
+
 ```{r Import ExRes csv}
 setwd("~/GitRepo/summerproject2021/Germline")
 # ExRes is a csv file
@@ -59,33 +73,272 @@ Exres=read.csv("ExRes.csv") ## file is > 1.7GB
 # "full" and "split" mode overlaps so choose only one mode to analyse at a time
 ```
 
+
 # Importing specific vcf files
-```{r Import vcf}
-setwd("~/GitRepo/summerproject2021/Germline/Germline_samples")
+```{r Import ExRes vcf}
+setwd("~/GitRepo/summerproject2021/Germline/ExResVCF")
 # Instead of using the big csv file
 # we can just import the vcf files of interest
-# so we can use countBreakpointOverlaps or something like that
-# for downstream analysis.
+# so we can use countBreakpointOverlaps etc for downstream analysis.
 
-# However, need to decompress and process the Svaba files
+# Manta: P=.36 R=.79 at 35x
+ER019_manta=readVcf("ER019_SAR1N.manta.vcf")
+ER052_manta=readVcf("ER052_MEL1N.manta.vcf")
+ER057_manta=readVcf("ER057_MEL2N.manta.vcf")
+ER095_manta=readVcf("ER095_MEL3N.manta.vcf")
+ER108_manta=readVcf("ER108_MEL5N.manta.vcf")
+ER118_manta=readVcf("ER118_MEL6N.manta.vcf")
+
+# SvABA: P=.53 R=.56 at 35x
+# You have to read the trimmed-unconverted svaba files first
+# and then replace:
+#
+# svaba_vcf$SVTYPE = svtype.csv$SV_type
+#
+# and check rowname matches
+
+# load old files
+setwd("~/GitRepo/summerproject2021/Germline/ExResVCF/Svaba_backup")
+ER019_svaba=readVcf("ER019_SAR1N.svaba.vcf")
+ER052_svaba=readVcf("ER052_MEL1N.svaba.vcf")
+ER057_svaba=readVcf("ER057_MEL2N.svaba.vcf")
+ER095_svaba=readVcf("ER095_MEL3N.svaba.vcf")
+ER108_svaba=readVcf("ER108_MEL5N.svaba.vcf")
+ER118_svaba=readVcf("ER118_MEL6N.svaba.vcf")
+
+# convert BND to proper SV types
+setwd("~/GitRepo/summerproject2021/Germline/ExResVCF")
+er1svt=read.csv("ER019_SAR1N.svtype.csv") %>% subset(select = -X)
+ER019_svaba@info$SVTYPE=er1svt$SV_type 
+## check 
+ER019_svaba@fixed$ALT==er1svt$ALT
+
+er2svt=read.csv("ER052_MEL1N.svtype.csv") %>% subset(select = -X)
+ER052_svaba@info$SVTYPE=er2svt$SV_type 
+## check 
+ER052_svaba@fixed$ALT==er2svt$ALT
+
+er3svt=read.csv("ER057_MEL2N.svtype.csv") %>% subset(select = -X)
+ER057_svaba@info$SVTYPE=er3svt$SV_type 
+## check 
+ER057_svaba@fixed$ALT==er3svt$ALT
+
+er4svt=read.csv("ER095_MEL3N.svtype.csv") %>% subset(select = -X)
+ER095_svaba@info$SVTYPE=er4svt$SV_type 
+## check 
+ER095_svaba@fixed$ALT==er4svt$ALT
+
+er5svt=read.csv("ER108_MEL5N.svtype.csv") %>% subset(select = -X)
+ER108_svaba@info$SVTYPE=er5svt$SV_type 
+## check 
+ER108_svaba@fixed$ALT==er5svt$ALT
+
+er6svt=read.csv("ER118_MEL6N.svtype.csv") %>% subset(select = -X)
+ER118_svaba@info$SVTYPE=er6svt$SV_type 
+## check 
+ER118_svaba@fixed$ALT==er6svt$ALT
+
+# Wham: P=.24 R=.57 at 35x
+setwd("~/GitRepo/summerproject2021/Germline/ExResVCF")
+ER019_wham=readVcf("ER019_SAR1N.wham.vcf")
+ER052_wham=readVcf("ER052_MEL1N.wham.vcf")
+ER057_wham=readVcf("ER057_MEL2N.wham.vcf")
+ER095_wham=readVcf("ER095_MEL3N.wham.vcf")
+ER108_wham=readVcf("ER108_MEL5N.wham.vcf")
+ER118_wham=readVcf("ER118_MEL6N.wham.vcf")
 ```
+
+# svgr
+```{r}
+# ER019
+ER019_manta_svgr=breakpointRanges(ER019_manta) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER019_svaba_svgr=breakpointRanges(ER019_svaba) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER019_wham_svgr=breakpointRanges(ER019_wham) %>% subset(.@elementMetadata[, 5] == "PASS")
+# ER052
+ER052_manta_svgr=breakpointRanges(ER052_manta) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER052_svaba_svgr=breakpointRanges(ER052_svaba) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER052_wham_svgr=breakpointRanges(ER052_wham) %>% subset(.@elementMetadata[, 5] == "PASS")
+# ER095
+ER057_manta_svgr=breakpointRanges(ER057_manta) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER057_svaba_svgr=breakpointRanges(ER057_svaba) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER057_wham_svgr=breakpointRanges(ER057_wham) %>% subset(.@elementMetadata[, 5] == "PASS")
+# ER095
+ER095_manta_svgr=breakpointRanges(ER095_manta) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER095_svaba_svgr=breakpointRanges(ER095_svaba) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER095_wham_svgr=breakpointRanges(ER095_wham) %>% subset(.@elementMetadata[, 5] == "PASS")
+# ER108
+ER108_manta_svgr=breakpointRanges(ER108_manta) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER108_svaba_svgr=breakpointRanges(ER108_svaba) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER108_wham_svgr=breakpointRanges(ER108_wham) %>% subset(.@elementMetadata[, 5] == "PASS")
+# ER118
+ER118_manta_svgr=breakpointRanges(ER118_manta) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER118_svaba_svgr=breakpointRanges(ER118_svaba) %>% subset(.@elementMetadata[, 5] == "PASS")
+ER118_wham_svgr=breakpointRanges(ER118_wham) %>% subset(.@elementMetadata[, 5] == "PASS")
+```
+
+# Caller info
+```{r}
+# ER019
+  ER019_manta$Caller="Manta"
+ER019_manta_svgr$Caller="Manta"
+  ER019_svaba$Caller="SvABA"
+ER019_svaba_svgr$Caller="SvABA"
+  ER019_wham$Caller="Wham"
+ER019_wham_svgr$Caller="Wham"
+# ER052
+  ER052_manta$Caller="Manta"
+ER052_manta_svgr$Caller="Manta"
+  ER052_svaba$Caller="SvABA"
+ER052_svaba_svgr$Caller="SvABA"
+  ER052_wham$Caller="Wham"
+ER052_wham_svgr$Caller="Wham"
+# ER057
+ER057_manta$Caller="Manta"
+  ER057_manta_svgr$Caller="Manta"
+ER057_svaba$Caller="SvABA"
+  ER057_svaba_svgr$Caller="SvABA"
+ER057_wham$Caller="Wham"
+  ER057_wham_svgr$Caller="Wham"
+# ER095
+ER095_manta$Caller="Manta"
+  ER095_manta_svgr$Caller="Manta"
+ER095_svaba$Caller="SvABA"
+  ER095_svaba_svgr$Caller="SvABA"
+ER095_wham$Caller="Wham"
+  ER095_wham_svgr$Caller="Wham"
+# ER108
+ER108_manta$Caller="Manta"
+  ER108_manta_svgr$Caller="Manta"
+ER108_svaba$Caller="SvABA"
+  ER108_svaba_svgr$Caller="SvABA"
+ER108_wham$Caller="Wham"
+  ER108_wham_svgr$Caller="Wham"
+# ER118
+ER118_manta$Caller="Manta"
+    ER118_manta_svgr$Caller="Manta"
+ER118_svaba$Caller="SvABA"
+    ER118_svaba_svgr$Caller="SvABA"
+ER118_wham$Caller="Wham"
+    ER118_wham_svgr$Caller="Wham"
+```
+
+
+# ExRes ID
+```{r}
+# ER019
+  ER019_manta$ExResID="ER019_SAR1N"
+ER019_manta_svgr$ExResID="ER019_SAR1N"
+  ER019_svaba$ExResID="ER019_SAR1N"
+ER019_svaba_svgr$ExResID="ER019_SAR1N"
+  ER019_wham$ExResID="ER019_SAR1N"
+ER019_wham_svgr$ExResID="ER019_SAR1N"
+# ER052
+  ER052_manta$ExResID="ER052_MEL1N"
+ER052_manta_svgr$ExResID="ER052_MEL1N"
+  ER052_svaba$ExResID="ER052_MEL1N"
+ER052_svaba_svgr$ExResID="ER052_MEL1N"
+  ER052_wham$ExResID="ER052_MEL1N"
+ER052_wham_svgr$ExResID="ER052_MEL1N"
+# ER057
+ER057_manta$ExResID="ER057_MEL2N"
+  ER057_manta_svgr$ExResID="ER057_MEL2N"
+ER057_svaba$ExResID="ER057_MEL2N"
+  ER057_svaba_svgr$ExResID="ER057_MEL2N"
+ER057_wham$ExResID="ER057_MEL2N"
+  ER057_wham_svgr$ExResID="ER057_MEL2N"
+# ER095
+ER095_manta$ExResID="ER095_MEL3N"
+  ER095_manta_svgr$ExResID="ER095_MEL3N"
+ER095_svaba$ExResID="ER095_MEL3N"
+  ER095_svaba_svgr$ExResID="ER095_MEL3N"
+ER095_wham$ExResID="ER095_MEL3N"
+  ER095_wham_svgr$ExResID="ER095_MEL3N"
+# ER108
+ER108_manta$ExResID="ER108_MEL5N"
+  ER108_manta_svgr$ExResID="ER108_MEL5N"
+ER108_svaba$ExResID="ER108_MEL5N"
+  ER108_svaba_svgr$ExResID="ER108_MEL5N"
+ER108_wham$ExResID="ER108_MEL5N"
+  ER108_wham_svgr$ExResID="ER108_MEL5N"
+# ER118
+ER118_manta$ExResID="ER118_MEL6N"
+    ER118_manta_svgr$ExResID="ER118_MEL6N"
+ER118_svaba$ExResID="ER118_MEL6N"
+    ER118_svaba_svgr$ExResID="ER118_MEL6N"
+ER118_wham$ExResID="ER118_MEL6N"
+    ER118_wham_svgr$ExResID="ER118_MEL6N"
+```
+
+
 
 # Using benchmarking results to analyse variant calls of interest
 
 Our previous benchmarking results using NA12878 WGS data shows:
 
-- Recall:
-> Manta has the highest recall rate of the five at 35x coverage (recall=0.79) and also even at 18x (recall=0.62).
-> Wham has the second-best recall rate at 35x (recall=0.56) but at 18x, its recall rate declined to as low as 0.017.
-> SvABA's recall rate at 35x coverage was only a bit shy of Wham (recall=0.55). However, at 18x coverage, it outwins Wham in recall rate (recall=0.086) albeit still significantly short of Manta.
-> Delly has modest recall rate at 35x (recall=0.30) and 18x (recall=0.049).
+- Recall (TP/size of truth set):
+> Manta outperforms other callers in recall rate at both 35x coverage (79%) and even 18x (62%)!
+> Wham gave second best recall rate at 35x (57%) but with lower precision (24%)
+> SvABA has relatively good performance at 35x (56%) with excellent precision (53%)!
 
-- Precision:
-> Despite the robust recall rate, Manta has lower precision at 35x compared to SvABA, which gave 51.8%, the highest of the five.
+- Precision (TP/total calls by caller):
+> Despite the robust recall rate, Manta has lower precision at 35x (36%, second-best of the four) compared to SvABA (53%)
+> SvABA consistently gives the highest precision of the four
 
+
+## Using vcf-generated svgr objects to locate variants of interest
 
 ```{r}
+#To do this, you need: 
+#(e.g. finding the list that has manta, svaba, wham)
 
+# test ER019 first
+ER019_manta$svaba_match=countBreakpointOverlaps(ER019_manta_svgr, ER019_svaba_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ER019_manta$wham_match=countBreakpointOverlaps(ER019_manta_svgr, ER019_wham_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+## what is this??
+ER019_manta$manta_match=countBreakpointOverlaps(ER019_manta_svgr, ER019_manta_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+ER019_svaba$wham_match=countBreakpointOverlaps(ER019_svaba_svgr, ER019_wham_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ER019_svaba$manta_match=countBreakpointOverlaps(ER019_svaba_svgr, ER019_manta_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ER019_svaba$svaba_match=countBreakpointOverlaps(ER019_svaba_svgr, ER019_svaba_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# 
+keepthese=which(ER019_svaba$manta_match=0 & ER019_svaba$wham_match >0)
+# 
+final_svgr=c(ER019_manta, ER019_svaba[keepthese])
+# 
+final_svgr$Ncallers=sign(final_svgr$manta_match)+sign(final_svgr$svaba_match)+sign(final_svgr$wham_match)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Using annotated file
+
+Use the vcf workflow first to extract-locate our variants of interest
+then use this workflow to inspect the biological details of these variants.
+
+```{r}
+# extract Manta/SvABA/Wham calls to search for
+# important SVs in the cohort
+Exres %>% filter(Annotation_mode == "split") %>% ## confirm later which is the one to filter (full or split?)
+  filter(Caller %in% c("Manta", "SvABA", "Wham")) %>% filter(FILTER == "PASS") -> variants
+
+## 386467/1686823 obs
 ```
 
 
