@@ -1,0 +1,95 @@
+---
+title: "Using SV caller-benchmarking results to analyse ExRes data"
+author: 
+  #David Fuh, <br/>
+  #Summer Intern, <br/>
+  #Garvan Institute of Medical Research, 
+  #Kinghorn Centre for Clinical Genomics, <br/>
+  #Sydney, NSW, Australia
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(
+                 fig.path   = 'figure/'
+               #, cache.path = 'cache/'
+               #, cache      = FALSE
+               , dev        = 'png'
+               , fig.align  = 'center'
+               , fig.show   = 'hold'
+               #, fig.width  = 8
+               #, fig.height = 6
+               #, out.width  = '.8\\linewidth'
+               , par        = TRUE
+               , echo       = TRUE ## toggle
+               , warning    = FALSE
+               , message    = FALSE
+               )
+```
+
+# Packages
+```{r Packages}
+library(tidyverse)
+library(paletteer)
+library(patchwork)
+library(GenomicRanges)
+library(StructuralVariantAnnotation)
+```
+
+# Importing annotated SV file (csv)
+```{r Import ExRes csv}
+setwd("~/GitRepo/summerproject2021/Germline")
+# ExRes is a csv file
+# that contains annotated info on the structural variants
+# detected by five callers (Delly, Manta, SvABA, Melt, Wham)
+# in each of the six patients from the Exceptional Responders cohort
+
+Exres=read.csv("ExRes.csv") ## file is > 1.7GB
+
+# Each entry in the file
+# is tagged with (1) Patient ID ($ExResID) and (2) Caller ($Caller)
+# and the annotation mode is marked in $Annotation_mode
+# "full" and "split" mode overlaps so choose only one mode to analyse at a time
+```
+
+# Importing specific vcf files
+```{r Import vcf}
+setwd("~/GitRepo/summerproject2021/Germline/Germline_samples")
+# Instead of using the big csv file
+# we can just import the vcf files of interest
+# so we can use countBreakpointOverlaps or something like that
+# for downstream analysis.
+
+# However, need to decompress and process the Svaba files
+```
+
+# Using benchmarking results to analyse variant calls of interest
+
+Our previous benchmarking results using NA12878 WGS data shows:
+
+- Recall:
+> Manta has the highest recall rate of the five at 35x coverage (recall=0.79) and also even at 18x (recall=0.62).
+> Wham has the second-best recall rate at 35x (recall=0.56) but at 18x, its recall rate declined to as low as 0.017.
+> SvABA's recall rate at 35x coverage was only a bit shy of Wham (recall=0.55). However, at 18x coverage, it outwins Wham in recall rate (recall=0.086) albeit still significantly short of Manta.
+> Delly has modest recall rate at 35x (recall=0.30) and 18x (recall=0.049).
+
+- Precision:
+> Despite the robust recall rate, Manta has lower precision at 35x compared to SvABA, which gave 51.8%, the highest of the five.
+
+
+```{r}
+
+```
+
+
+
+
+
+

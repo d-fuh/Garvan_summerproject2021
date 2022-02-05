@@ -351,6 +351,17 @@ PR %>% filter(Caller != "Melt") %>%
   theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2)) + 
   ylab("Precision (cross) & Recall (red triangle)")
 
-ggsave("~/GitRepo/summerproject2021/Pres/NA12878_PR_plot_no_melt.png")
+#ggsave("~/GitRepo/summerproject2021/Pres/NA12878_PR_plot_no_melt.png")
 ```
 
+```{r PR bar plot without Melt}
+PR %>% filter(Caller != "Melt") %>%
+  ggplot() +
+  geom_bar(aes(x=Caller, y=Recall), fill="coral", stat="identity", width=0.5) +
+  geom_point(aes(x=Caller, y=Precision), shape=3, size=2.7) +
+  facet_wrap(~Cov, nrow=1) +
+  theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2)) + 
+  ylab("Precision (cross) & Recall (bar)")
+
+ggsave("~/GitRepo/summerproject2021/Pres/NA12878_PR_bar_plot_no_melt.png")
+```
