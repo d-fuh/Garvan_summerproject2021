@@ -333,7 +333,8 @@ Exres %>% filter(Annotation_mode == "split") %>% ## confirm later which is the o
 
 
 ## Using vcf-generated svgr objects to locate variants of interest
-### ER019
+
+### ER019: 30, Ewings Sarcoma, Pembrolizumab, Complete response
 ```{r ER019 match}
 # test ER019 first
 ER019_manta_svgr$svaba_match=countBreakpointOverlaps(ER019_manta_svgr, ER019_svaba_svgr, maxgap=200, sizemargin=0.25,
@@ -386,11 +387,19 @@ ER019_q=ER019[which(ER019$ID %in% ER019_svgr$sourceId), ] ## csv$ID ~= svgr$sour
 
 ## this is in csv that we can use to inspect its biological details
 ER019cond=which(ER019$ID %in% ER019_svgr$sourceId)
-ER019_q$Ncallers=ER019_svgr$Ncallers[which(ER019$ID %in% ER019_svgr$sourceId)]
+ER019_q$Ncallers=ER019_svgr$Ncallers[which(ER019$ID %in% ER019_svgr$sourceId)] ## grab Ncallers stat from ER_svgr
+## grab SV_type stats as well, since the annotSV files still has unconverted BND
+## This one is trickier?
+# Have to splice ER019_q by Svaba/non-svaba first
+ER019_q %>% filter(Caller == "SvABA") -> ER019sva
+# mutate the svaba subset
+ER019sva$SV_type=ER019_svgr$svtype[which(ER019_svgr$Caller=="SvABA" & ER019_svgr$sourceId %in% ER019_q$ID)]
+# then glue the two chunks back together as ER019 (new)
+ER019_q=right_join(ER019sva, ER019_q)
 ```
 
 
-ER019 profile:
+#### ER019 profile:
 
 - Ewing sarcoma (tumour in bone)
 - Ewing sarcoma is a primary bone tumor initiated by *EWSR1*–*ETS* gene fusions (Tirode F, Surdez D, Ma X, et al. 2014).^[ref 1]
@@ -432,6 +441,86 @@ ewsr2=ER019_q[b, ]
 
 dplyr::full_join(ewsr, ewsr2) %>% subset(select=SV_profile) -> ER019.special
 ```
+
+
+### ER108: 61, Melanoma, pembrolizumab, Complete response
+```{r ER108 match}
+# test ER108 next
+ER108_manta_svgr$svaba_match=countBreakpointOverlaps(ER108_manta_svgr, ER108_svaba_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ER108_manta_svgr$wham_match=countBreakpointOverlaps(ER108_manta_svgr, ER108_wham_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ER108_manta_svgr$manta_match=countBreakpointOverlaps(ER108_manta_svgr, ER108_manta_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+ER108_svaba_svgr$wham_match=countBreakpointOverlaps(ER108_svaba_svgr, ER108_wham_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ER108_svaba_svgr$manta_match=countBreakpointOverlaps(ER108_svaba_svgr, ER108_manta_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ER108_svaba_svgr$svaba_match=countBreakpointOverlaps(ER108_svaba_svgr, ER108_svaba_svgr, maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# selection criteria for final_svgr
+keepthese=which(ER108_svaba_svgr$manta_match==0 & ER108_svaba_svgr$wham_match > 0)
+# only want Manta (stand-alone) and Svaba-of-which-confirmed-by-Wham
+ER108_svgr=c(ER108_manta_svgr, ER108_svaba_svgr[keepthese])
+# caller count measure
+ER108_svgr$Ncallers=sign(ER108_svgr$manta_match)+sign(ER108_svgr$svaba_match)+sign(ER108_svgr$wham_match)
+```
+```{r ER108 variant extraction}
+# Exres %>% (split) %>% (caller in Manta/Svaba/Wham) %>% (PASS) -> variants
+variants %>% filter(ExResID == "ER108_MEL5N") -> ER108 ## this is all calls by Manta/Svaba/Wham from ER108 in csv
+
+# qualification: by criteria "keepthese"
+ER108_q=ER108[which(ER108$ID %in% ER108_svgr$sourceId), ] ## csv$ID ~= svgr$sourceId
+                                                          ## ER108 is csv called by Manta/Sv/Wh; 
+                                                          ## ER108_svgr is svgr called by Manta/(Sv+Wh)
+
+## this is in csv that we can use to inspect its biological details
+ER108cond=which(ER108$ID %in% ER108_svgr$sourceId)
+ER108_q$Ncallers=ER108_svgr$Ncallers[which(ER108$ID %in% ER108_svgr$sourceId)]
+```
+
+#### ER108 profile:
+
+- Melanoma
+- Also (as ER019) received pembrolizumab (anti-PD-1 MAb) treatment
+- Complete response (as ER019)
+
+
+#### ER108 gene list
+
+- PD-1/PD-LG axis
+-- "PDCD1", "CD273", "CD274", "PDCD1LG2"
+
+- Melanoma lit review
+
+-- (GeneCards; by descending score)
+-- "*CDKN2A*", "CDK4", "BRAF", "MC1R", 
+-- "POT1", "MITF", "NRAS", "BAP1", "*GNAQ*", "GNA11" (Wham; high-Q)
+-- "KIT", "PTEN", "*TERT*", "TP53"
+
+
+
+```{r ER108 special (important SV list)}
+# curate a gene list known to relate to Ewing Sarcoma that were mentioned
+ER108_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
+             "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11",
+             "KIT", "PTEN", "TERT", "TP53",
+             "PDCD1", "CD273", "CD274", "PDCD1LG2")
+
+## ER108_q: Called by Manta/(Sv+Wh)
+# are any of the listed genes varied in ER108 and detected by our callers/accroding to our criteria "keepthese"?
+er108gene=which(ER108_q$Gene_name %in% ER108_list)
+# also try
+#ER108cond=which(ER108$Gene_name %in% ER108_list)
+# for the unconditioned one
+
+ER108.test=ER108_q[er108gene, ]
+
+ER108.test %>% subset(select=SV_profile) -> ER108.special
+```
+
+
 
 
 
