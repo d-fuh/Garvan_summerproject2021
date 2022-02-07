@@ -356,10 +356,10 @@ colnames(megimmuno)="Gene_name"
 ```
 
 
-# Qualification list
+# Census_cosmic gene list
 ```{r}
-# need standardise the gene list for every sample
-gene_list=
+cosmic=read.csv("Census_cosmic.csv")
+cosmic_mel=filter(cosmic, Tumor.Types.Somatic %in% c("ALL", "T-ALL", "Melanoma"))
 ```
 
 
@@ -367,7 +367,28 @@ gene_list=
 # Using vcf-generated svgr objects to locate variants of interest
 
 
-### ER019: 30, Ewings Sarcoma, Pembrolizumab, Complete response
+## ER019: 30, Ewings Sarcoma, Pembrolizumab, Complete response
+
+### ER019 profile:
+
+- Ewing sarcoma (tumour in bone)
+- Ewing sarcoma is a primary bone tumor initiated by *EWSR1*–*ETS* gene fusions (Tirode F, Surdez D, Ma X, et al. 2014).^[ref 1]
+
+> Apart from whole chromosome arm copy-number changes, the most common somatic mutations were detected in *STAG2* (17%), *CDKN2A* (12%), *TP53* (7%), *EZH2*, *BCOR*, and *ZMYM3* (2.7% each). Strikingly, STAG2 mutations and CDKN2A deletions were mutually exclusive, as confirmed in Ewing sarcoma cell lines (ibid.).
+
+> Genetically, most Ewing sarcomas are characterized by a specific t(11;22)(q12;q11.2) translocation that fuses the EWSR1 gene on chromosome (chr) 22 with the *FLI1* gene on chr 11
+
+> In 10%–15% of cases, EWSR1 is fused to other members of the ETS family of transcription factors, including *ERG*, *ETV1*, *E1AF*, or *FEV*. 
+
+> In an even smaller number of cases, *TAF15* and *TLS*/*FUS*, the two other members of the TET family of RNA-binding proteins may be fused to ETS family members (1).
+
+> The long arm of chr 16 and the *CDKN2A* locus on chr 9p are the most common copy-number losses in Ewing sarcoma.
+
+- Patient received **pembrolizumab**, an anti-*PD-1* monoclonal antibody therapy.
+- PD-1 is encoded by PDCD1
+- PD-L1 --- CD274
+- PD-L2 --- PDCD1LG2
+
 ```{r ER019 match}
 # test ER019 first
 ER019_manta_svgr$svaba_match=countBreakpointOverlaps(ER019_manta_svgr, ER019_svaba_svgr, maxgap=200, sizemargin=0.25,
@@ -391,20 +412,6 @@ ER019_svgr=c(ER019_manta_svgr, ER019_svaba_svgr[keepthese])
 ER019_svgr$Ncallers=sign(ER019_svgr$manta_match)+sign(ER019_svgr$svaba_match)+sign(ER019_svgr$wham_match)
 ```
 
-How to extract locations of these variants that qualify?
-
-Or: something like
-
-    Exres %>% filter(Annotation_mode == "split") %>% 
-    
-        filter(ExResID == "ER019_SAR1N") -> ER019 ## this is all calls in ER019 in csv
-
-    ER019_q=ER019[which(ER019_svgr$ALT == ER019$ALT)] ## is there a better measure than ALT as SV ID?
-
-    ## q is for qualified
-    ## "qualified" = called by Manta AND both of svaba and wham, but not by both Manta and svaba.
-
-
 ```{r ER019 variant extraction}
 # in the later workflow
 # we have filtered Exres already
@@ -423,62 +430,6 @@ ER019cond=which(ER019$ID %in% ER019_svgr$sourceId)
 ER019_q$Ncallers=ER019_svgr$Ncallers[which(ER019$ID %in% ER019_svgr$sourceId)] ## grab Ncallers stat from ER_svgr
 ```
 
-
-```{r ER019 BND, eval=FALSE}
-## grab SV_type stats as well, since the annotSV files still has unconverted BND
-## This one is trickier?
-# Have to splice ER019_q by Svaba/non-svaba first
-ER019_q %>% filter(Caller == "SvABA") -> ER019sva
-# mutate the svaba subset
-ER019sva$SV_type=ER019_svgr$svtype[which(ER019_svgr$Caller=="SvABA" & ER019_svgr$sourceId %in% ER019_q$ID)]
-# then glue the two chunks back together as ER019 (new)
-ER019_q=right_join(ER019sva, ER019_q)
-```
-
-
-#### ER019 profile:
-
-- Ewing sarcoma (tumour in bone)
-- Ewing sarcoma is a primary bone tumor initiated by *EWSR1*–*ETS* gene fusions (Tirode F, Surdez D, Ma X, et al. 2014).^[ref 1]
-
-> Apart from whole chromosome arm copy-number changes, the most common somatic mutations were detected in *STAG2* (17%), *CDKN2A* (12%), *TP53* (7%), *EZH2*, *BCOR*, and *ZMYM3* (2.7% each). Strikingly, STAG2 mutations and CDKN2A deletions were mutually exclusive, as confirmed in Ewing sarcoma cell lines (ibid.).
-
-> Genetically, most Ewing sarcomas are characterized by a specific t(11;22)(q12;q11.2) translocation that fuses the EWSR1 gene on chromosome (chr) 22 with the *FLI1* gene on chr 11
-
-> In 10%–15% of cases, EWSR1 is fused to other members of the ETS family of transcription factors, including *ERG*, *ETV1*, *E1AF*, or *FEV*. 
-
-> In an even smaller number of cases, *TAF15* and *TLS*/*FUS*, the two other members of the TET family of RNA-binding proteins may be fused to ETS family members (1).
-
-> The long arm of chr 16 and the *CDKN2A* locus on chr 9p are the most common copy-number losses in Ewing sarcoma.
-
-- Patient received **pembrolizumab**, an anti-*PD-1* monoclonal antibody therapy.
-- PD-1 is encoded by PDCD1
-- PD-L1 --- CD274
-- PD-L2 --- PDCD1LG2 or CD273?
-
-```{r ER019 test, eval=FALSE}
-# Is EWSR1-ETS fusion detected by our callers?
-a=which(ER019_q$Gene_name %in% c("EWSR1", "ETS")) ## ER019_q: Called by Manta/(Sv+Wh)
-# What was the mutation?
-ER019_q$ALT[a]
-# More info
-ewsr=ER019_q[a, ]
-
-# curate a gene list known to relate to Ewing Sarcoma that were mentioned
-ewsr_list=c("STAG2", "CDKN2A", "TP53", "EZH2", "BCOR", "ZMYM3", 
-            "FLI1", 
-            "ERG", "ETV1", "E1AF", "FEV",
-            "TAF15", "TLS", "FUS",
-            "PDCD1", "CD273", "CD274", "PDCD1LG2") ## CD274 and PD-L2 (PDCD1LG2) detected by Wham only --- therefore not in _q
-
-# are any of these genes varied in ER019 and detected by our callers?
-b=which(ER019_q$Gene_name %in% ewsr_list)
-
-ewsr2=ER019_q[b, ]
-
-dplyr::full_join(ewsr, ewsr2) %>% subset(select=SV_profile) -> ER019.special
-```
-
 ```{r ER019 special (important SV list)}
 ER019_list=c("EWSR1", "ETS",
             "STAG2", "CDKN2A", "TP53", "EZH2", "BCOR", "ZMYM3", 
@@ -494,18 +445,33 @@ ER019.test=ER019_q[er019gene, ]
 ER019.test %>% subset(select=SV_profile) -> ER019.special
 ```
 
-```{r ER019 megimmuno}
-ER019_q[which(ER019_q$Gene_name %in% megimmuno$Gene_name), ] %>% subset(select=SV_profile) %>%
-  filter(Ncallers >= 2) -> ER019.meg
-```
 
 
 
 
 
+## ER108: 61, Melanoma, pembrolizumab, Complete response
+
+### ER108 profile:
+
+- Melanoma
+- Also (as ER019) received pembrolizumab (anti-PD-1 MAb) treatment
+- Complete response (as ER019)
 
 
-### ER108: 61, Melanoma, pembrolizumab, Complete response
+### ER108 gene list
+
+- PD-1/PD-LG axis
+-- "PDCD1", "CD273", "CD274", "PDCD1LG2"
+
+- Melanoma lit review
+
+-- (GeneCards; by descending score)
+-- "*CDKN2A*", "CDK4", "BRAF", "MC1R", 
+-- "POT1", "MITF", "NRAS", "BAP1", "*GNAQ*", "GNA11"
+-- "KIT", "PTEN", "*TERT*", "TP53"
+
+
 ```{r ER108 match and variant extraction}
 # test ER108 next
 ER108_manta_svgr$svaba_match=countBreakpointOverlaps(ER108_manta_svgr, ER108_svaba_svgr, maxgap=200, sizemargin=0.25,
@@ -541,26 +507,6 @@ ER108cond=which(ER108$ID %in% ER108_svgr$sourceId)
 ER108_q$Ncallers=ER108_svgr$Ncallers[which(ER108$ID %in% ER108_svgr$sourceId)]
 ```
 
-#### ER108 profile:
-
-- Melanoma
-- Also (as ER019) received pembrolizumab (anti-PD-1 MAb) treatment
-- Complete response (as ER019)
-
-
-#### ER108 gene list
-
-- PD-1/PD-LG axis
--- "PDCD1", "CD273", "CD274", "PDCD1LG2"
-
-- Melanoma lit review
-
--- (GeneCards; by descending score)
--- "*CDKN2A*", "CDK4", "BRAF", "MC1R", 
--- "POT1", "MITF", "NRAS", "BAP1", "*GNAQ*", "GNA11"
--- "KIT", "PTEN", "*TERT*", "TP53"
-
-
 
 ```{r ER108 special (important SV list)}
 ER108_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
@@ -579,10 +525,6 @@ ER108.test %>% subset(select=SV_profile) -> ER108.special
 ```
 
 
-```{r ER108 megimmuno}
-ER108_q[which(ER108_q$Gene_name %in% megimmuno$Gene_name), ] %>% subset(select=SV_profile) %>%
-  filter(Ncallers >= 2) -> ER108.meg
-```
 
 
 
@@ -590,10 +532,28 @@ ER108_q[which(ER108_q$Gene_name %in% megimmuno$Gene_name), ] %>% subset(select=S
 
 
 
+## ER118: 87, Melanoma, "anti-PD1", Complete response
+
+### ER118 profile:
+
+- Melanoma
+- Also (as ER019, ER108) received "anti-PD-1" treatment
+- Complete response (as ER019, ER108)
 
 
+### ER118 gene list
 
-### ER118: 87, Melanoma, "anti-PD1", Complete response
+- PD-1/PD-LG axis
+-- "PDCD1", "CD273", "CD274", "PDCD1LG2"
+
+- Melanoma lit review
+
+-- (GeneCards; by descending score)
+-- "CDKN2A", "CDK4", "BRAF", "MC1R", 
+-- "POT1", "*MITF*", "NRAS", "BAP1", "GNAQ", "GNA11"
+-- "KIT", "PTEN", "*TERT*", "TP53"
+
+
 ```{r ER118 match and variant extraction}
 ER118_manta_svgr$svaba_match=countBreakpointOverlaps(ER118_manta_svgr, ER118_svaba_svgr, maxgap=200, sizemargin=0.25,
                                               restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
@@ -628,26 +588,6 @@ ER118cond=which(ER118$ID %in% ER118_svgr$sourceId)
 ER118_q$Ncallers=ER118_svgr$Ncallers[which(ER118$ID %in% ER118_svgr$sourceId)]
 ```
 
-#### ER118 profile:
-
-- Melanoma
-- Also (as ER019, ER108) received "anti-PD-1" treatment
-- Complete response (as ER019, ER108)
-
-
-#### ER118 gene list
-
-- PD-1/PD-LG axis
--- "PDCD1", "CD273", "CD274", "PDCD1LG2"
-
-- Melanoma lit review
-
--- (GeneCards; by descending score)
--- "CDKN2A", "CDK4", "BRAF", "MC1R", 
--- "POT1", "*MITF*", "NRAS", "BAP1", "GNAQ", "GNA11"
--- "KIT", "PTEN", "*TERT*", "TP53"
-
-
 
 ```{r ER118 special (important SV list)}
 # curate a gene list known to relate to Ewing Sarcoma that were mentioned
@@ -667,16 +607,37 @@ ER118.test=ER118_q[er118gene, ]
 ER118.test %>% subset(select=SV_profile) -> ER118.special
 ```
 
-```{r ER118 megimmuno}
-ER118_q[which(ER118_q$Gene_name %in% megimmuno$Gene_name), ] %>% subset(select=SV_profile) %>%
-  filter(Ncallers >= 2) -> ER118.meg
-```
 
 
 
 
+## ER095: 76, Melanoma/PRCA, nivolumab
 
-### ER095: 76, Melanoma/PRCA, nivolumab
+### ER095 profile:
+
+- Melanoma/PRCA (Pure red cell aplasia)
+- Received nivolumab (anti-PD1 MAb) treatment
+
+
+> Nivolumab is an antibody against programmed cell death 1 and functions as an immune checkpoint inhibitor for various malignancies, including unresectable melanomas. ^[(Yuki A, Takenouchi T, Takatsuka S, Ishiguro T. A case of pure red cell aplasia during nivolumab therapy for cardiac metastatic melanoma. Melanoma Res. 2017 Dec;27(6):635-637. doi: 10.1097/CMR.0000000000000392. PMID: 28872489.)]
+
+> There is incidence of nivolumab-induced PRCA as reported by Ishiguro et al.
+
+
+### ER095 gene list
+
+- PD-1/PD-LG axis
+-- "PDCD1", "CD273", "CD274", "PDCD1LG2"
+
+- Melanoma lit review
+
+-- (GeneCards; by descending score)
+-- "**CDKN2A**", "CDK4", "*BRAF*", "MC1R", 
+-- "POT1", "MITF", "NRAS", "BAP1", "*GNAQ*", "GNA11"
+-- "*KIT*", "PTEN", "*TERT*", "TP53"
+
+
+
 ```{r ER095 match and variant extraction}
 ER095_manta_svgr$svaba_match=countBreakpointOverlaps(ER095_manta_svgr, ER095_svaba_svgr, maxgap=200, sizemargin=0.25,
                                               restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
@@ -711,31 +672,6 @@ ER095cond=which(ER095$ID %in% ER095_svgr$sourceId)
 ER095_q$Ncallers=ER095_svgr$Ncallers[which(ER095$ID %in% ER095_svgr$sourceId)]
 ```
 
-#### ER095 profile:
-
-- Melanoma/PRCA (Pure red cell aplasia)
-- Received nivolumab (anti-PD1 MAb) treatment
-
-
-> Nivolumab is an antibody against programmed cell death 1 and functions as an immune checkpoint inhibitor for various malignancies, including unresectable melanomas. ^[(Yuki A, Takenouchi T, Takatsuka S, Ishiguro T. A case of pure red cell aplasia during nivolumab therapy for cardiac metastatic melanoma. Melanoma Res. 2017 Dec;27(6):635-637. doi: 10.1097/CMR.0000000000000392. PMID: 28872489.)]
-
-> There is incidence of nivolumab-induced PRCA as reported by Ishiguro et al.
-
-
-#### ER095 gene list
-
-- PD-1/PD-LG axis
--- "PDCD1", "CD273", "CD274", "PDCD1LG2"
-
-- Melanoma lit review
-
--- (GeneCards; by descending score)
--- "**CDKN2A**", "CDK4", "*BRAF*", "MC1R", 
--- "POT1", "MITF", "NRAS", "BAP1", "*GNAQ*", "GNA11"
--- "*KIT*", "PTEN", "*TERT*", "TP53"
-
-
-
 ```{r ER095 special (important SV list)}
 # same list as ER108, ER118 (penbrolizumab)
 ER095_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
@@ -754,17 +690,44 @@ ER095.test=ER095_q[er095gene, ]
 ER095.test %>% subset(select=SV_profile) -> ER095.special
 ```
 
-```{r ER095 megimmuno}
-ER095_q[which(ER095_q$Gene_name %in% megimmuno$Gene_name), ] %>% subset(select=SV_profile) %>%
-  filter(Ncallers >= 2) -> ER095.meg
-```
 
 
 
 
 
+## ER057: 57, Melanoma, Dacarbazine, Complete response
 
-### ER057: 57, Melanoma, Dacarbazine, Complete response
+### ER057 profile:
+
+- Melanoma
+- Received *Dacarbazine* treatment
+
+> Dacarbazine: "Alkylation-type" chemotherapeutic (pro)drug, exact MoA unknown.
+> "It inhibits DNA and RNA synthesis by forming carbonium ions" => Induce tumour DNA damage?
+
+
+> The expression of O6-methylguanine-DNA methyltransferase from *MGMT* reverses tumor DNA damage induced by dacarbazine. Promoter methylation of MGMT has been shown to predict response of metastatic colorectal cancer (mCRC) to dacarbazine treatment [29, 30].^[Mohamad M. Kronfol, Joseph L. McClay, in Prognostic Epigenetics, 2019]
+
+
+    Can ER057's variation on MGMT conferred their sensitivity to DTIC?
+    (Complete response rate of DTIC in the population is 5%?)
+
+
+*cf.* Butler M, Pongor L, Su YT, Xi L, Raffeld M, Quezado M, Trepel J, Aldape K, Pommier Y, Wu J. MGMT Status as a Clinical Biomarker in Glioblastoma. Trends Cancer. 2020 May;6(5):380-391. doi: 10.1016/j.trecan.2020.02.010. Epub 2020 Mar 27. PMID: 32348734; PMCID: PMC7315323.
+
+
+### ER057 gene list
+
+- "*MGMT*"
+
+- Melanoma lit review
+
+-- (GeneCards; by descending score)
+-- "CDKN2A", "CDK4", "BRAF", "MC1R", 
+-- "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11"
+-- "KIT", "PTEN", "TERT", "TP53"
+
+
 ```{r ER057 match and variant extraction}
 ER057_manta_svgr$svaba_match=countBreakpointOverlaps(ER057_manta_svgr, ER057_svaba_svgr, maxgap=200, sizemargin=0.25,
                                               restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
@@ -799,37 +762,6 @@ ER057cond=which(ER057$ID %in% ER057_svgr$sourceId)
 ER057_q$Ncallers=ER057_svgr$Ncallers[which(ER057$ID %in% ER057_svgr$sourceId)]
 ```
 
-#### ER057 profile:
-
-- Melanoma
-- Received *Dacarbazine* treatment
-
-> Dacarbazine: "Alkylation-type" chemotherapeutic (pro)drug, exact MoA unknown.
-> "It inhibits DNA and RNA synthesis by forming carbonium ions" => Induce tumour DNA damage?
-
-
-> The expression of O6-methylguanine-DNA methyltransferase from *MGMT* reverses tumor DNA damage induced by dacarbazine. Promoter methylation of MGMT has been shown to predict response of metastatic colorectal cancer (mCRC) to dacarbazine treatment [29, 30].^[Mohamad M. Kronfol, Joseph L. McClay, in Prognostic Epigenetics, 2019]
-
-
-    Can ER057's variation on MGMT conferred their sensitivity to DTIC?
-    (Complete response rate of DTIC in the population is 5%?)
-
-
-*cf.* Butler M, Pongor L, Su YT, Xi L, Raffeld M, Quezado M, Trepel J, Aldape K, Pommier Y, Wu J. MGMT Status as a Clinical Biomarker in Glioblastoma. Trends Cancer. 2020 May;6(5):380-391. doi: 10.1016/j.trecan.2020.02.010. Epub 2020 Mar 27. PMID: 32348734; PMCID: PMC7315323.
-
-
-#### ER057 gene list
-
-- "*MGMT*"
-
-- Melanoma lit review
-
--- (GeneCards; by descending score)
--- "CDKN2A", "CDK4", "BRAF", "MC1R", 
--- "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11"
--- "KIT", "PTEN", "TERT", "TP53"
-
-
 ```{r ER057 special (important SV list)}
 ER057_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
              "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11",
@@ -847,18 +779,33 @@ ER057.test=ER057_q[er057gene, ]
 ER057.test %>% subset(select=SV_profile) -> ER057.special
 ```
 
-```{r ER057 megimmuno}
-ER057_q[which(ER057_q$Gene_name %in% megimmuno$Gene_name), ] %>% subset(select=SV_profile) %>%
-  filter(Ncallers >= 2) -> ER057.meg
-```
 
 
 
 
 
 
+## ER052: 52, Melanoma, traditional, Stable disease
 
-### ER052: 52, Melanoma, traditional, Stable disease
+### ER052 profile:
+
+- Melanoma
+- Received traditional treatment
+- Stable disease
+
+
+### ER052 gene list
+
+- Melanoma lit review
+
+-- (GeneCards; by descending score)
+-- "CDKN2A", "CDK4", "BRAF", "MC1R", 
+-- "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11"
+-- "KIT", "PTEN", "TERT", "TP53"
+
+- What are the SVs that ER052 do not have or have that the other 5 do not have?
+
+
 ```{r ER052 match and variant extraction}
 ER052_manta_svgr$svaba_match=countBreakpointOverlaps(ER052_manta_svgr, ER052_svaba_svgr, maxgap=200, sizemargin=0.25,
                                               restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
@@ -892,25 +839,6 @@ ER052_q=ER052[which(ER052$ID %in% ER052_svgr$sourceId), ] ## csv$ID ~= svgr$sour
 ER052cond=which(ER052$ID %in% ER052_svgr$sourceId)
 ER052_q$Ncallers=ER052_svgr$Ncallers[which(ER052$ID %in% ER052_svgr$sourceId)]
 ```
-
-#### ER052 profile:
-
-- Melanoma
-- Received traditional treatment
-- Stable disease
-
-
-#### ER052 gene list
-
-- Melanoma lit review
-
--- (GeneCards; by descending score)
--- "CDKN2A", "CDK4", "BRAF", "MC1R", 
--- "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11"
--- "KIT", "PTEN", "TERT", "TP53"
-
-- What are the SVs that ER052 do not have or have that the other 5 do not have?
-
 
 ```{r ER052 special (important SV list)}
 ER052_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
@@ -991,11 +919,16 @@ p1=ggplot(ExRes.special) + aes(x=ExResID) + geom_bar() + ggtitle("Variant count 
 p2=ggplot(ExRes.meg) + aes(x=ExResID) + geom_bar() + ggtitle("Variant count | megimmuno") + xlab("") +
   theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2))
 
-p1+p2
+# filter?
+p2b=ExRes.meg %>% filter(., ACMG_class == "full=5") %>% filter(., Ncallers >=2) %>% 
+  ggplot() + aes(x=ExResID) + geom_bar() +
+  ggtitle("Variant count | megimmuno") + xlab("") +
+  theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2))
 
-ggsave("variant_count_among_cohort.png")
+p1+p2b
+
+#ggsave("variant_count_among_cohort.png")
 ```
-
 
 
 

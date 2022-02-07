@@ -1,0 +1,31 @@
+ER019_list=c("EWSR1", "ETS",
+            "STAG2", "CDKN2A", "TP53", "EZH2", "BCOR", "ZMYM3", 
+            "FLI1", 
+            "ERG", "ETV1", "E1AF", "FEV",
+            "TAF15", "TLS", "FUS",
+            "PDCD1", "CD273", "CD274", "PDCD1LG2")
+
+ER108_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
+             "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11",
+             "KIT", "PTEN", "TERT", "TP53",
+             "PDCD1", "CD273", "CD274", "PDCD1LG2")
+
+ER118_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
+             "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11",
+             "KIT", "PTEN", "TERT", "TP53",
+             "PDCD1", "CD273", "CD274", "PDCD1LG2")
+
+ER095_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
+             "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11",
+             "KIT", "PTEN", "TERT", "TP53",
+             "PDCD1", "CD273", "CD274", "PDCD1LG2")
+
+ER057_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
+             "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11",
+             "KIT", "PTEN", "TERT", "TP53",
+             "MGMT")
+
+ER052_list=c("CDKN2A", "CDK4", "BRAF", "MC1R",
+             "POT1", "MITF", "NRAS", "BAP1", "GNAQ", "GNA11",
+             "KIT", "PTEN", "TERT", "TP53",
+             "MGMT")
