@@ -2,8 +2,15 @@
 Caller,Delly,Manta,SvABA,Wham,Delly,Manta,SvABA,Wham,Delly,Manta,SvABA,Wham,Delly,Manta,SvABA,Wham
 Precision,21%,36%,53%,24%,26%,48%,63%,31%,38%,44%,68%,33%,22%,34%,40%,18%
 Recall,31%,79%,56%,57%,26%,62%,46%,37%,11%,4%,13%,13%,1%,1%,2%,2%
+calls,7816,12080,5804,12788,5350,7080,3998,6516,1544,474,1070,2118,372,238,280,548
 ,,,,,,,,,,,,,,,,
 TRENDS:,,,,,,,,,,,,,,,,
 1. Precision: Trend presists regardless of coverage level; drops with decreasing coverage except at 6x where precision spiked for all groups (Possibly noise).,,,,,,,,,,,,,,,,
 "2. Recall: Manta gives highest recall in acceptable coverage level (35x). Remarkably, even at 18x coverage Manta maintained a 62% recall rate with 48% precision.",,,,,,,,,,,,,,,,
 "3. At 35x coverage, Manta has the best recall rate while SvABA gave the best Precision/Recall performance.",,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+,,,,,,,,,,,,,,,,
+Q&A:,,,,,,,,,,,,,,,,
+1. Why are there no error bars?,,,,,,,,,,,,,,,,
+"> There aren't because there cannot be. SE=SD/sqrt(n). The bars here represent Recall=n(TP)/|truth set|, not a mean of an array of observations. As a result, this value is absolute with variance 0 ¡X In other words, there is no error.",,,,,,,,,,,,,,,,
+(It either is or isn't),,,,,,,,,,,,,,,,
