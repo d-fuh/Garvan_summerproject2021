@@ -356,13 +356,6 @@ colnames(megimmuno)="Gene_name"
 ```
 
 
-# Census_cosmic gene list
-```{r}
-cosmic=read.csv("Census_cosmic.csv")
-cosmic_mel=filter(cosmic, Tumor.Types.Somatic %in% c("ALL", "T-ALL", "Melanoma"))
-```
-
-
 
 # Using vcf-generated svgr objects to locate variants of interest
 
@@ -861,7 +854,12 @@ ER052_q[er052gene, ] %>% subset(select=SV_profile) -> ER052.special
 # Joining important variant calls to one file
 
 ## main
+
 ```{r exres join}
+full_join(ER019_q, ER108_q) %>% full_join(ER118_q) %>% full_join(ER095_q) %>% full_join(ER057_q) %>% full_join(ER052_q) -> ExRes_q
+```
+
+```{r exres.special join}
 # each ExRes variant calls
 # that were deemed important by our workflow
 # were stored in "ExResID.special" dataframes
@@ -906,6 +904,29 @@ write.csv(ExRes.meg, file="ExRes_meg_variants.csv")
 # Cohort-wide analysis
 
 ## main
+
+```{r N callers stat}
+ExRes_q %>%
+  ggplot() + aes(x=Ncallers) + geom_histogram()
+
+table(ExRes_q$Ncallers)
+```
+
+```{r Variant call count by genome}
+ExRes_q$SV_chrom=factor(ExRes_q$SV_chrom, levels = as.character(c(1:22, "X", "Y")))
+ggplot(ExRes_q) + aes(x=SV_chrom, fill=ExResID) + geom_bar(position = "dodge") + theme_bw() + xlab("Chromosome") +ylab("Count")
+ggsave("Variant_per_chr.png")
+```
+
+```{r SV type by caller}
+variants %>% 
+  ggplot() + aes(x=SV_type, fill=Caller) + geom_bar(position = "dodge")
+```
+
+
+
+
+
 ```{r Variant call count}
 # variant call in the qualified set per sample
 p1=ggplot(ExRes.special) + aes(x=ExResID) + geom_bar() + ggtitle("Variant count | Qualified") + xlab("") +
@@ -930,7 +951,124 @@ p1+p2b
 #ggsave("variant_count_among_cohort.png")
 ```
 
+## KaryoploteR
+```{r}
+library(karyoploteR)
+SV <- GRanges(seqnames=paste0("chr", ExRes_q$SV_chrom), 
+              ranges=IRanges(start=ExRes_q$SV_start, end=ExRes_q$SV_end), 
+              ACMG=ExRes_q$ACMG_class) 
 
+kp <- plotKaryotype(genome="hg19")
+
+SV_cool=SV[which(SV$ACMG %in% c("full=5", "full=4")), ]
+
+kpPlotRegions(kp, SV, col="#FFAACC")
+
+kpPlotRegions(kp, SV_cool, col="#CCFFAA")
+```
+
+```{r}
+# ER019
+SV019 <- GRanges(seqnames=paste0("chr", ER019_q$SV_chrom), 
+              ranges=IRanges(start=ER019_q$SV_start, end=ER019_q$SV_end), 
+              ACMG=ER019_q$ACMG_class) 
+
+cool019=SV019[which(SV019$ACMG %in% c("full=5", "full=4")), ]
+
+kp <- plotKaryotype(genome="hg19")
+
+kpPlotRegions(kp, SV019, col="#FFAACC")
+
+kpPlotRegions(kp, cool019, col="#CCFFAA")
+```
+
+```{r}
+# ER057
+SV057 <- GRanges(seqnames=paste0("chr", ER057_q$SV_chrom), 
+              ranges=IRanges(start=ER057_q$SV_start, end=ER057_q$SV_end), 
+              ACMG=ER057_q$ACMG_class)
+
+cool057=SV057[which(SV057$ACMG %in% c("full=5", "full=4")), ]
+
+kp <- plotKaryotype(genome="hg19")
+kpPlotRegions(kp, SV057, col="#FFAACC")
+kpPlotRegions(kp, cool057, col="#CCFFAA")
+```
+
+
+```{r}
+# ER095
+SV095 <- GRanges(seqnames=paste0("chr", ER095_q$SV_chrom), 
+              ranges=IRanges(start=ER095_q$SV_start, end=ER095_q$SV_end), 
+              ACMG=ER095_q$ACMG_class)
+
+cool095=SV095[which(SV095$ACMG %in% c("full=5", "full=4")), ]
+
+kp <- plotKaryotype(genome="hg19")
+kpPlotRegions(kp, SV095, col="#FFAACC")
+kpPlotRegions(kp, cool095, col="#CCFFAA")
+```
+
+
+```{r}
+# ER108
+SV108 <- GRanges(seqnames=paste0("chr", ER108_q$SV_chrom), 
+              ranges=IRanges(start=ER108_q$SV_start, end=ER108_q$SV_end), 
+              ACMG=ER108_q$ACMG_class)
+
+cool108=SV108[which(SV108$ACMG %in% c("full=5", "full=4")), ]
+
+kp <- plotKaryotype(genome="hg19")
+kpPlotRegions(kp, SV108, col="#FFAACC")
+kpPlotRegions(kp, cool108, col="#CCFFAA")
+```
+
+
+```{r}
+# ER118
+SV118 <- GRanges(seqnames=paste0("chr", ER118_q$SV_chrom), 
+              ranges=IRanges(start=ER118_q$SV_start, end=ER118_q$SV_end), 
+              ACMG=ER118_q$ACMG_class)
+
+cool118=SV118[which(SV118$ACMG %in% c("full=5", "full=4")), ]
+
+kp <- plotKaryotype(genome="hg19")
+kpPlotRegions(kp, SV118, col="#FFAACC")
+kpPlotRegions(kp, cool118, col="#CCFFAA")
+```
+
+```{r}
+# ER052
+SV052 <- GRanges(seqnames=paste0("chr", ER052_q$SV_chrom), 
+              ranges=IRanges(start=ER052_q$SV_start, end=ER052_q$SV_end), 
+              ACMG=ER052_q$ACMG_class)
+
+cool052=SV052[which(SV052$ACMG %in% c("full=5", "full=4")), ]
+
+kp <- plotKaryotype(genome="hg19")
+kpPlotRegions(kp, SV052, col="#FFAACC")
+kpPlotRegions(kp, cool052, col="#CCFFAA")
+```
+
+
+
+## karyoplot-ish
+```{r}
+library(viridis)
+
+ExRes_q %>% filter(ACMG_class != "full=NA") %>%
+  ggplot() + aes(x=SV_chrom, y=reorder(CytoBand, desc(CytoBand)), fill=ACMG_class) + 
+  
+  ## change to dplyr:: "Count the number of ACMG_class of this type in this cytoband
+  geom_tile(aes(alpha = Gene_count)) + 
+  
+  scale_fill_viridis_d(name = "ACMG class", labels = paste(c("1", "3", "4", "5"))) +
+  xlab("") + ylab("In cytoband order") +
+  theme_bw() + theme(panel.grid.major = element_blank(), axis.text.y=element_blank(), axis.ticks.y = element_blank(),
+                     panel.background = element_rect(fill = "grey25"))
+
+ggsave("Karyotype_exres.png")
+```
 
 
 

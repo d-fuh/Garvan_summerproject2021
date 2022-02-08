@@ -1,0 +1,41 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+# plot
+ggplot(svt) + aes(x=svtype, fill=Caller) + geom_bar(position="dodge") + facet_wrap(~Cov, nrow=1) + theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2)) + ylab("Count") + xlab("Type of structural variant")
+ggsave("SV_type_by_caller.png")
+```
+
+```{r}
+# sv type by coverage
+ggplot(svt) + aes(x=svtype, fill=Cov) + geom_bar(position="dodge") + theme_bw() +
+  ylab("Count") + xlab("Type of structural variant") + 
+  paletteer::scale_fill_paletteer_d("LaCroixColoR::PommeBaya", name="Coverage")
+ggsave("SV_type_by_coverage.png")
+```
+
+
+```{r}
+# SV type and length, but must wrap by caller (or else duplicate counts confound)
+ExRes_q %>% 
+  filter(!is.na(SV_length)) %>%
+  ggplot() + aes(x=abs(SV_length), color = SV_type) + 
+  geom_line(aes(y=..count..), stat="bin", size = 1.05) +
+  facet_wrap(~Caller) + 
+  theme_classic() + 
+  paletteer::scale_colour_paletteer_d("khroma::bright", name = "SV type") +
+  scale_x_log10(name = "SV size (log-scaled)", 
+                breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
+                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  scale_y_continuous(trans = "log10", 
+                name = "Counts (log-scaled)",
+                breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
+                label = c("10", "100", "1k", "10k", "100k"))
+
+ggsave("SV_length_trend.png")
+```
+
+
