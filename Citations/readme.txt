@@ -1,1 +1,0 @@
-This is the directory for citation files related to the project.
