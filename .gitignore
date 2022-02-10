@@ -7,27 +7,16 @@
 *.DS_Store
 *.pptx
 
-worknote.txt
-
-Germline/ExRes.csv
-
 # Citations
 Citations/*.*
 
-# NA12878 main folder
-NA12878_benchmark/AnnotSV_vis_*.html
+# NA12878
+NA12878_benchmark/**/AnnotSV_vis_*.html
 NA12878_benchmark/**/*.nb.html
+NA12878_benchmark/AnnotSV_vis_files/*.*
 
-# AnnotSV visualisation files
-NA12878_benchmark/AnnotVis/*.*
-Germline/AnnotVis/*.*
-
-# Items from previous version
-NA12878_benchmark/Version_previous/**/*.*
-NA12878_benchmark/Figures/Previous_version/**/*.*
-
-# Maestro_scripts
-NA12878_benchmark/Maestro_scripts/maestro.full.csv
-NA12878_benchmark/Maestro_scripts/maestro.split.csv
-NA12878_benchmark/Maestro_scripts/**/AnnotSV_NA12878_delly.tsv
-NA12878_benchmark/Maestro_scripts/**/AnnotSV_NA12878_delly_split.tsv
+# Exceptional responders
+Exceptional_responders/ExRes.csv
+Exceptional_responders/ExRes_q.rds
+Exceptional_responders/AnnotSV_vis_files/*.*
+Exceptional_responders/Annotated_variant_set_per_ID/*.*

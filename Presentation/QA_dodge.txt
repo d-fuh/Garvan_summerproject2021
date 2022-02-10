@@ -1,0 +1,27 @@
+Q&A DODGE
+
+- (Slide 1) How was the truth set constructed?
+Good question. It was actually a bit too long to summarise in the slides, but it was described in detail by the Lam et al paper in their Methods section. Basically they have assembled the deletion data from the Personalis database, which included around 2000 deletion calls that have been Pedigree-analysed and/or PCR-confirmed. This was then combined with sets of variants from the 1k genome project, which has been validated by assembly or other techniques like array comparative genomic hybridization, sequence capture array, or PCR. Insertion data from Spiral Genetics were also included. We joined these sets together in our own workflow. These aforementioned variant sets that have been used in multiple similar benchmarking studies using NA12878, so we have examined that prior to our analysis.
+
+
+- (Slide 1) Did you use any quality check for your variant calls?
+A: Yes, we filtered the variants based on the quality indicator present in the VCF files. 
+
+
+- (Slide 1) Could you elaborate on how you matched the call with the truth set?
+Yes, so it was a simplification that I said we matched a variant with a validated variant by their breakpoint overlap. We had to design paddings and constraints for this match, for example we could not require the breakpoint overlap to be exact between two matched calls, because that would be too stringent. So we designed a 200 bp window for each breakend. But from this we need to design other measures so that, say, a 50 bp insertion is not matched with a 150 bp deletion. This is all done within the Structural Variant Annotation package that we used.
+
+
+- (Slide 2/3) Something about combining the callers?
+A: Good question. We had actually thought about a combination-of-caller study for our benchmarking project, but then comes the question how does that actually optimise performance. We decided it was best to just look at singular performace of each caller first and how they compare against each other to have a general idea about these callers before we move on. And by the time we finished it was already week 8 or something.
+
+
+- (Slide 3) So, are Wham and Delly unrecommended? Is there a scenario where we might want to use them?
+Currently we would recommend Manta as the all-in-one caller for most general variant calling using WGS data. GRIDSS is also a popular choice but was not included in our study.
+
+
+- (Slide 3) How did you measure the support reads?
+A: For SvABA we used the discordant support reads plus split reads from the VCF; for Manta we extracted the spanning paired read support plus split reads for the alternative alleles.
+
+
+

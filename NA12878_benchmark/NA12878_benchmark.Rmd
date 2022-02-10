@@ -1,0 +1,408 @@
+---
+title: "Benchmarking Structural Variant Callers using NA12878 WGS reference"
+author: 
+  David Fuh, <br/>
+  Summer Intern, <br/>
+  Garvan Institute of Medical Research, 
+  Kinghorn Centre for Clinical Genomics, <br/>
+  Sydney, NSW, Australia
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+```{r setup, include=FALSE, cache=FALSE}
+knitr::opts_chunk$set(
+                 fig.path   = 'figure/'
+               #, cache.path = 'cache/'
+               #, cache      = FALSE
+               , dev        = 'png'
+               , fig.align  = 'center'
+               , fig.show   = 'hold'
+               #, fig.width  = 8
+               #, fig.height = 6
+               #, out.width  = '.8\\linewidth'
+               , par        = TRUE
+               , echo       = TRUE ## toggle
+               , warning    = FALSE
+               , message    = FALSE
+               )
+```
+
+# Packages
+```{r Packages}
+library(tidyverse)
+library(paletteer)
+library(patchwork)
+library(GenomicRanges)
+library(StructuralVariantAnnotation)
+```
+
+# Truth SV set of NA12878
+
+```{r Read in validated truth SV set for NA12878, message=F}
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/VCF")
+
+## NA12878 truth set: personlis + spiral, hg38
+personalis_vcf <- readVcf("test_personalis_hg38.vcf", "hg38") ## > 2k DEL data
+spiral_vcf <- readVcf("test_spiral_hg38.vcf", "hg38") ## Only 68 entries!
+
+## truth set is biased towards DEL calls
+## Check the sv type distribution among callers at 35X
+## and see if correction is needed.
+
+## Are there other sources (e.g. 1k genome project) that contains
+## other validated SV data from NA12878
+## so we can increase the diversity of SV types in our truth set?
+
+## joining personalis data and spiral genetics data into one vcf
+truth_vcf <- rbind(personalis_vcf, spiral_vcf)
+
+## generate truth_svgr: note 2X count
+truth_svgr <- breakpointRanges(truth_vcf)
+```
+
+# Importing VCF from GATK-SV & SvABA
+
+```{r caller vcf, warning=F}
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/VCF")
+# 35X
+delly_vcf <- readVcf("NA12878.delly.vcf", "hg38")
+manta_vcf <- readVcf("NA12878.manta.vcf", "hg38")
+melt_vcf <- readVcf("NA12878.melt.vcf", "hg38")
+wham_vcf <- readVcf("NA12878.wham.vcf", "hg38")
+svaba_vcf <- readVcf("NA12878.svaba.vcf", "hg38")
+
+# 18X
+ft_delly_vcf <- readVcf("NA12878_50pc_sampled.delly.vcf", "hg38")
+ft_manta_vcf <- readVcf("NA12878_50pc_sampled.manta.vcf", "hg38")
+ft_melt_vcf <- readVcf("NA12878_50pc_sampled.melt.vcf", "hg38")
+ft_wham_vcf <- readVcf("NA12878_50pc_sampled.wham.vcf", "hg38")
+ft_svaba_vcf <- readVcf("NA12878_50pc_sampled.svaba.vcf", "hg38")
+
+# 6X
+med_delly_vcf <- readVcf("NA12878_med.delly.vcf", "hg38")
+med_manta_vcf <- readVcf("NA12878_med.manta.vcf", "hg38")
+med_melt_vcf <- readVcf("NA12878_med.melt.vcf", "hg38")
+med_wham_vcf <- readVcf("NA12878_med.wham.vcf", "hg38")
+med_svaba_vcf <- readVcf("NA12878_med.svaba.vcf", "hg38")
+```
+
+
+# VCF to svgr by genomicRanges
+
+```{r caller svgr, warning=F}
+# 35X
+delly_svgr <- breakpointRanges(delly_vcf)
+manta_svgr <- breakpointRanges(manta_vcf)
+melt_svgr <- breakpointRanges(melt_vcf)
+wham_svgr <- breakpointRanges(wham_vcf)
+svaba_svgr <- breakpointRanges(svaba_vcf)
+
+# 18X
+ft_delly_svgr <- breakpointRanges(ft_delly_vcf)
+ft_manta_svgr <- breakpointRanges(ft_manta_vcf)
+ft_melt_svgr <- breakpointRanges(ft_melt_vcf)
+ft_wham_svgr <- breakpointRanges(ft_wham_vcf)
+ft_svaba_svgr <- breakpointRanges(ft_svaba_vcf)
+
+# 6X
+med_delly_svgr <- breakpointRanges(med_delly_vcf)
+med_manta_svgr <- breakpointRanges(med_manta_vcf)
+med_melt_svgr <- breakpointRanges(med_melt_vcf)
+med_wham_svgr <- breakpointRanges(med_wham_vcf)
+med_svaba_svgr <- breakpointRanges(med_svaba_vcf)
+```
+
+
+## Filter
+```{r svgr filter and dimensions}
+# 35X
+delly_svgr=subset(delly_svgr, delly_svgr@elementMetadata[, 5] == "PASS") ## 7816/39070
+manta_svgr=subset(manta_svgr, manta_svgr@elementMetadata[, 5] == "PASS") ## 12080/14174
+melt_svgr=subset(melt_svgr, melt_svgr@elementMetadata[, 5] == "PASS") ## 2006/3782
+wham_svgr=subset(wham_svgr, wham_svgr@elementMetadata[, 5] == "PASS") ## 12788/12788
+svaba_svgr=subset(svaba_svgr, svaba_svgr@elementMetadata[, 5] == "PASS") ## 5804/5804
+
+# 18X
+ft_delly_svgr=subset(ft_delly_svgr, ft_delly_svgr@elementMetadata[, 5] == "PASS") 
+ft_manta_svgr=subset(ft_manta_svgr, ft_manta_svgr@elementMetadata[, 5] == "PASS") 
+ft_melt_svgr=subset(ft_melt_svgr, ft_melt_svgr@elementMetadata[, 5] == "PASS") 
+ft_wham_svgr=subset(ft_wham_svgr, ft_wham_svgr@elementMetadata[, 5] == "PASS") 
+ft_svaba_svgr=subset(ft_svaba_svgr, ft_svaba_svgr@elementMetadata[, 5] == "PASS") 
+
+# 6X
+med_delly_svgr=subset(med_delly_svgr, med_delly_svgr@elementMetadata[, 5] == "PASS") ## 1544/?
+med_manta_svgr=subset(med_manta_svgr, med_manta_svgr@elementMetadata[, 5] == "PASS") ## 474/?
+med_melt_svgr=subset(med_melt_svgr, med_melt_svgr@elementMetadata[, 5] == "PASS") ## 904/?
+med_wham_svgr=subset(med_wham_svgr, med_wham_svgr@elementMetadata[, 5] == "PASS") ## 2118/?
+med_svaba_svgr=subset(med_svaba_svgr, med_svaba_svgr@elementMetadata[, 5] == "PASS") ## 1070/?
+```
+
+## Assign caller info
+```{r Assigning callers to svgr, warning=F}
+# 35X
+delly_svgr$Caller <- "Delly"
+manta_svgr$Caller <- "Manta"
+melt_svgr$Caller <- "Melt"
+wham_svgr$Caller <- "Wham"
+svaba_svgr$Caller <- "SvABA"
+
+# 18X
+ft_delly_svgr$Caller <- "Delly"
+ft_manta_svgr$Caller <- "Manta"
+ft_melt_svgr$Caller <- "Melt"
+ft_wham_svgr$Caller <- "Wham"
+ft_svaba_svgr$Caller <- "SvABA"
+
+# 6X
+med_delly_svgr$Caller <- "Delly"
+med_manta_svgr$Caller <- "Manta"
+med_melt_svgr$Caller <- "Melt"
+med_wham_svgr$Caller <- "Wham"
+med_svaba_svgr$Caller <- "SvABA"
+```
+
+## Assigning coverage (Cov) info
+
+Estimates*:
+
+- "Full/Large" file: 35X
+- "50pc": 18X
+- "Medium": 6X
+- "Small": 1X (Omitted)
+
+
+*These numbers need to be confirmed by samtools etc. We only eyeballed the overall depth using our header_maprate_depth workflow on Terra.
+
+
+```{r Assigning coverage to svgr, warning=FALSE}
+# 35X
+delly_svgr$Cov <- "35x"
+manta_svgr$Cov <- "35x"
+melt_svgr$Cov <- "35x"
+wham_svgr$Cov <- "35x"
+svaba_svgr$Cov <- "35x"
+
+# 18X
+ft_delly_svgr$Cov <- "18x"
+ft_manta_svgr$Cov <- "18x"
+ft_melt_svgr$Cov <- "18x"
+ft_wham_svgr$Cov <- "18x"
+ft_svaba_svgr$Cov <- "18x"
+
+# 6X
+med_delly_svgr$Cov <- "6x"
+med_manta_svgr$Cov <- "6x"
+med_melt_svgr$Cov <- "6x"
+med_wham_svgr$Cov <- "6x"
+med_svaba_svgr$Cov <- "6x"
+```
+
+
+# Precision / Recall
+
+## Generating truth matches
+
+A variant call (made by either caller) is matched against the validated truth set (NA12878) with countBreakpointOverlaps.
+
+(BioC::StructuralVariantAnnotation/Papenfuss Lab, WEHI)
+
+The criteria for a true positive are:
+
+    Breakpoint overlap > 0 (i.e. At least one breakend "overlapping" with a true call)
+
+The overlapping criteria:
+
+    1. (Padding) "maxgap=200" allows each breakend a window of 200 bp between a call and a validated true variant
+    
+    2. (Size difference) "sizemargin=0.25" ensures two variants do not differ their size by 0.25 of their mean (? this needs to be confirmed in vignette)
+    
+    3. (Distance cap) "restrictMarginToSizeMultiple=0.5" restricts the distance between two variants to be at most 0.5 times the mean size of both variant. This prevents matching two (smaller) calls that are too far away from each other but were tolerated due to the 200 bp padding design.
+
+    4. (Deduplication) "countOnlyBest=TRUE" ensures that duplicate calls that differ slightly in breakend positions are counted as one. We are unsure if this argument was necessary for our workflow but included it as a safety measure.*
+    
+    
+*Some variant callers, such as Hydra, are known to duplicate calls. We are not sure if in the GATK callers or SvABA algorithm similar situation can arise. This should be able to be confirmed in literature.
+
+
+Note that in the following steps, we applied the same measure/constraints for every caller at every depth level, regardless of the "style" each caller performs when calling a variant. We are interested in whether we can fine-tune these measures for each caller so that our results are less biased.
+
+
+```{r Truth matches, warning=F}
+# 35X
+delly_svgr$truth_matches <- countBreakpointOverlaps(delly_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+manta_svgr$truth_matches <- countBreakpointOverlaps(manta_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+melt_svgr$truth_matches <- countBreakpointOverlaps(melt_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+wham_svgr$truth_matches <- countBreakpointOverlaps(wham_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+svaba_svgr$truth_matches <- countBreakpointOverlaps(svaba_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# 35X svgr concatenation
+large_svgr <- c(delly_svgr, manta_svgr, melt_svgr, wham_svgr, svaba_svgr)
+
+
+
+# 18X
+ft_delly_svgr$truth_matches <- countBreakpointOverlaps(ft_delly_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                          restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ft_manta_svgr$truth_matches <- countBreakpointOverlaps(ft_manta_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                          restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ft_melt_svgr$truth_matches <- countBreakpointOverlaps(ft_melt_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                         restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ft_wham_svgr$truth_matches <- countBreakpointOverlaps(ft_wham_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                         restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+ft_svaba_svgr$truth_matches <- countBreakpointOverlaps(ft_svaba_svgr, truth_svgr, maxgap=200, sizemargin=0.25,
+                                                          restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+# 18X svgr concatenation
+ft_svgr <- c(ft_delly_svgr, ft_manta_svgr, ft_melt_svgr, ft_wham_svgr, ft_svaba_svgr)
+
+
+
+# 6X
+med_delly_svgr$truth_matches <- countBreakpointOverlaps(med_delly_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+med_manta_svgr$truth_matches <- countBreakpointOverlaps(med_manta_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+med_melt_svgr$truth_matches <- countBreakpointOverlaps(med_melt_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+med_wham_svgr$truth_matches <- countBreakpointOverlaps(med_wham_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+med_svaba_svgr$truth_matches <- countBreakpointOverlaps(med_svaba_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# 6X svgr concatenation
+med_svgr <- c(med_delly_svgr, med_manta_svgr, med_melt_svgr, med_wham_svgr, med_svaba_svgr)
+```
+
+
+## Generating precision-recall (PR) data
+```{r Preparation of data frame for PR, warning=F}
+PR=data.frame()
+
+# extract the key variables
+# we need for each caller at each coverage level:
+
+# Precision = n(TP)/n(Calls made by a caller)
+# Recall = n(TP)/n(true variants)
+
+# where TP = true positive is a variant call that has at least one breakpoint overlap
+# with those in the validated true set.
+
+## 35X
+PR_large = as.data.frame(large_svgr) %>%
+         
+         dplyr::select(Caller, truth_matches) %>%
+  
+         dplyr::group_by(Caller) %>%
+  
+    dplyr::summarise(
+    
+      calls=dplyr::n(), ## total calls made by each caller at 35X 
+    
+      tp=sum(truth_matches > 0)) %>% ## true positive counts for each caller at 35X
+  
+    dplyr::mutate(
+    
+      fp=calls-tp, ## false positive counts (FP) are calls made by a caller that are not true
+    
+      Precision=tp/calls, ## precision := true positive calls/total calls made by each caller
+    
+      Recall=tp/length(truth_svgr) ## recall := true positive calls/total counts of  validated variants
+      )
+
+PR_large$Cov <- "35X" ## assigning coverage info to data frame
+
+
+## Similarly for 18X
+PR_fiftypc = as.data.frame(ft_svgr) %>%
+  
+  dplyr::select(Caller, truth_matches) %>%
+  dplyr::group_by(Caller) %>%
+  
+  dplyr::summarise(
+    calls=dplyr::n(),
+    tp=sum(truth_matches > 0)) %>%
+  
+  dplyr::mutate(
+    fp=calls-tp,
+    Precision=tp/calls,
+    Recall=tp/length(truth_svgr)
+  )
+
+PR_fiftypc$Cov <- "18X"
+
+
+
+## 6X
+PR_medium = as.data.frame(med_svgr) %>%
+  
+  dplyr::select(Caller, truth_matches) %>%
+  dplyr::group_by(Caller) %>%
+    
+  dplyr::summarise(
+      calls=dplyr::n(),
+      tp=sum(truth_matches > 0)) %>%
+  
+  dplyr::mutate(
+      fp=calls-tp,
+      Precision=tp/calls,
+      Recall=tp/length(truth_svgr)
+      )
+
+PR_medium$Cov <- "6X"
+
+# join these statistics into one data frame
+PR=plyr::join(PR_large, PR_medium, type = "full") %>% plyr::join(., PR_fiftypc, type = "full")
+
+# reorder panel header level for PR plot below
+PR$Cov <- factor(PR$Cov, levels = c("35X", "18X", "6X"))
+```
+
+
+## Plotting precision-recall statistics
+```{r PR plot}
+# plot
+ggplot(PR) +
+  geom_point(aes(x=Caller, y=Recall), shape=25, fill="red", size=2.5) +
+  geom_point(aes(x=Caller, y=Precision), shape=3, size=2.7) +
+  facet_wrap(~Cov, nrow=1) +
+  theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2)) + 
+  ylab("Precision (cross) & Recall (red triangle)")
+```
+
+
+Note that Melt has no true positive counts at each coverage level. Our hypothesis is that this has to do with the way Melt calls variants --- Melt is designed to report small mobile element insertions (MEIs) that have an overall size of ~280 bp. Our truth set was biased towards deletions (Personalis data ~2k deletions / ~2k+68 calls validated) of sizes from 50 bp to well-over 20Mb. 
+As a result, we need to expand and critique the true set before re-analysing the following benchmarking data.
+
+
+However, due to the time constraint and the scope for this project, we will carry on with our analysis by omitting Melt from our benchmarking study.
+
+
+```{r PR bar plot without Melt}
+PR %>% filter(Caller != "Melt") %>%
+  ggplot() +
+  geom_bar(aes(x=Caller, y=Recall), fill="#D75078", stat="identity", width=0.5) +
+  geom_point(aes(x=Caller, y=Precision), shape=3, size=2.7) +
+  facet_wrap(~Cov, nrow=1) +
+  theme_bw() + theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2)) + 
+  xlab("") + ylab("")
+```

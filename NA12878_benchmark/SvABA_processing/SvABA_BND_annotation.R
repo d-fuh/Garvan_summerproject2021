@@ -1,14 +1,14 @@
-# Read in svaba vcf file
 library(dplyr)
-# This is the svaba file with redundant headers trimmed
-# Use SvABA_header_trimmer.R if not
-svaba.vcf="~/Documents/GitHub/summerproject2021/NA12878_benchmark/SvABA_processing/NA12878_small.svaba.vcf"
+# Import the svaba vcf file with redundant headers trimmed
+# Use SvABA_header_trimmer.R first if not
+svaba.vcf="~/Documents/GitHub/summerproject2021/NA12878_benchmark/SvABA_processing/SvABA_VCF_backup/NA12878.svaba.vcf"
 
 cols <- colnames(read.table(pipe(paste0('grep -v "##" ', svaba.vcf,' | grep "#"| sed s/#//')), header = TRUE))
 cols <- sapply(cols, function(x) gsub("(mrkdp\\.)|(\\.bam)", "", x))
 
 svaba_uniq <- read.table(svaba.vcf, col.names = cols, stringsAsFactors = FALSE)
 
+# Assign SV type
 get_sv_type <- function(x){
   # Find mate pair
   root <- gsub(":[12]", "", x)
@@ -33,5 +33,12 @@ get_sv_type <- function(x){
 }
 
 svaba_uniq$SV_type <- sapply(svaba_uniq$ID, get_sv_type)
+
 # write to new vcf
+# write.vcf from vcfR does not accept the object
+# double check if the output format is correct
 write.table(svaba_uniq, "svaba_converted.vcf")
+
+# as a more convenient backup
+# we can also export the sv type info in csv
+write.csv(svaba_uniq, "svaba_converted.csv")

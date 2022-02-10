@@ -1,13 +1,10 @@
-This is the directory for raw SvABA VCF file processing workflow.
+The VCF files from the SvABA workflow requires extensive processing to achieve compatibility with other caller outputs from the GATK-SV workflow.
 
-# Workflow Overview
+We compiled the following scripts as a pipeline to process SvABA output (VCF) in order to benchmark the results:
 
-SvABA VCF generation -> svaba.sv.vcf -> **SvABA_output_processing.rmd** 
-
--> svaba.new.vcf -> **SvABA_annotation.R** -> svaba.uniq (R data frame/csv)
-
--> (optional) SvABA_further_annotation [INCOMPLETE]
-
--> **merge_svaba_to_benchmark.R** -> benchmark.full/split (R data frame/csv)
-
--> **NA12878_benchmark/maestro2.0.Rmd** (main benchmark workflow)
+### Pipeline (Using MacOS is advised)
+#### Input: SvABA *.vcf.gz
+#### 1. Use SvABA_header_trimmer.R to remove redundant columns
+#### 2. Decompress the output from (1)
+#### 3. (Optional) Use SvABA_BND_converter to convert the sv type column (all BND) to proper SV types (INV/DEL/DUP-INS) based on breakpoint orientation [source:]
+ 

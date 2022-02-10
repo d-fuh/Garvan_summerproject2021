@@ -1,0 +1,227 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+```{r}
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/Maestro_scripts/VCF")
+
+## NA12878 truth set: personlis + spiral, hg38
+personalis_vcf <- readVcf("test_personalis_hg38.vcf", "hg38")
+spiral_vcf <- readVcf("test_spiral_hg38.vcf", "hg38")
+
+truth_vcf <- rbind(personalis_vcf, spiral_vcf)
+
+## truth_svgr
+truth_svgr <- breakpointRanges(truth_vcf)
+```
+
+
+```{r}
+# consistent naming
+info(svaba_vcf)$allele_depth=geno(svaba_vcf)$AD
+info(svaba_vcf)$total_depth=geno(svaba_vcf)$AD + geno(svaba_vcf)$DP
+
+# I think we want DR+SR instead for ALT
+info(svaba_vcf)$supportingReads=geno(svaba_vcf)$DR+geno(svaba_vcf)$SR
+
+
+# create svgr object
+svaba_svgr<-breakpointRanges(svaba_vcf, info_columns=c("supportingReads", "total_depth"))
+
+# Assign a column for caller name
+svaba_svgr$Caller="SvABA"
+svaba_svgr$Cov=="35x"
+# Need to filter out the variants that pass
+svaba_svgr=svaba_svgr[which(svaba_svgr$FILTER=="PASS")]
+```
+
+```{r}
+# get hist and box of svaba$supportingReads
+par(mfrow=c(1,2))
+hist(svaba_svgr$supportingReads, main="SvABA support reads")
+boxplot(svaba_svgr$supportingReads, main="SvABA support reads")
+```
+
+```{r}
+mean(svaba_svgr$supportingReads)
+sd(svaba_svgr$supportingReads)
+median(svaba_svgr$supportingReads)
+```
+
+> mean(svaba_svgr$supportingReads)
+[1] 17.27016
+> sd(svaba_svgr$supportingReads)
+[1] 10.26346
+
+
+
+```{r}
+# manta
+# PR
+PR=geno(manta_vcf)$PR
+
+## Note this entire thing is a list, You will need to extract every first item in this list.
+info(manta_vcf)$PR_ref=sapply(PR, function(x) x[1]) ## PR[1]
+info(manta_vcf)$PR_alt=sapply(PR, function(x) x[2]) ## PR[2]
+
+# Same for SR
+SR=geno(manta_vcf)$SR
+
+## Note this entire thing is a list, You will need to extract every first item in this list.
+info(manta_vcf)$SR_ref=sapply(SR, function(x) x[1]) ## SR[1]
+info(manta_vcf)$SR_alt=sapply(SR, function(x) x[2]) ## SR[2]
+
+
+# Then compute our stats
+#
+# SV support:   PR[2] + SR[2] 
+# Total depth:  SR[1]+SR[2]+PR[1]+PR[2]
+
+
+info(manta_vcf)$supportingReads=info(manta_vcf)$PR_alt+info(manta_vcf)$SR_alt
+info(manta_vcf)$total_depth=info(manta_vcf)$SR_ref+info(manta_vcf)$SR_alt+info(manta_vcf)$PR_ref+info(manta_vcf)$PR_alt
+
+
+# create svgr object
+  # omit BND_DEPTH
+manta_svgr=breakpointRanges(manta_vcf, info_columns=c("supportingReads", "total_depth"))
+
+
+# assign caller
+manta_svgr$Caller="Manta"
+manta_svgr$Cov="35x"
+# filter
+manta_svgr=manta_svgr[which(manta_svgr$FILTER=="PASS")]
+
+rm(PR, SR)
+```
+
+```{r}
+# get hist and box of manta$supportingReads
+par(mfrow=c(1,2))
+hist(manta_svgr$supportingReads, main="Manta support reads")
+boxplot(manta_svgr$supportingReads, main="Manta support reads")
+```
+
+```{r}
+# manta support reads have NA
+na.omit(manta_svgr$supportingReads) %>% mean()
+na.omit(manta_svgr$supportingReads) %>% sd()
+na.omit(manta_svgr$supportingReads) %>% median()
+```
+
+> na.omit(manta_svgr$supportingReads) %>% mean()
+[1] 24.35048
+> na.omit(manta_svgr$supportingReads) %>% sd()
+[1] 12.75649
+
+
+```{r, message=F}
+as.data.frame(c(manta_svgr, svaba_svgr)) %>%
+  ggplot() + aes(x=supportingReads, fill=Caller) + geom_histogram() + 
+  theme_classic() + ylab("Count") + xlab("Supporting reads (log-scaled)") + scale_x_log10() +
+  theme(legend.position = "none") -> p1
+
+as.data.frame(c(manta_svgr, svaba_svgr)) %>%
+  ggplot() + aes(x=Caller, y=supportingReads, color=Caller) + geom_boxplot() + 
+  theme_bw() + ylab("Supporting reads") -> p2
+
+library(patchwork)
+p1+p2
+```
+
+```{r}
+as.data.frame(c(manta_svgr, svaba_svgr)) %>%
+  ggplot() + aes(x=total_depth, fill=Caller) + geom_histogram() + 
+  theme_classic() + ylab("Count") + xlab("Total depth (log-scaled)") + scale_x_log10() +
+  theme(legend.position = "none") -> p3
+
+as.data.frame(c(manta_svgr, svaba_svgr)) %>%
+  ggplot() + aes(x=Caller, y=total_depth, color=Caller) + geom_boxplot() + scale_y_log10() +
+  theme_bw() + ylab("Total depth (log-scaled)") -> p4
+
+p3+p4
+```
+
+
+```{r}
+# summary stats for total depth
+# svaba total depth = DR + SR (ALT?)
+sd(svaba_svgr$total_depth)
+summary(svaba_svgr$total_depth)
+# manta total depth = SR + PR (ALT)
+na.omit(manta_svgr$total_depth) %>% sd()
+na.omit(manta_svgr$total_depth) %>% summary()
+```
+
+
+
+
+Total call count all used svgr objects:
+vcf & svgr differ in nrows !?
+
+> dim(manta_svgr@elementMetadata)
+[1] 12080    17
+> dim(manta_vcf@info)
+[1] 7451   26
+
+> dim(svaba_svgr@elementMetadata)
+[1] 5804   16
+> dim(svaba_vcf@info)
+[1] 5804   22
+
+> dim(truth_svgr@elementMetadata)
+[1] 5474   13
+> dim(truth_vcf@elementMetadata)
+[1] 2737    0
+> dim(truth_vcf@info)
+[1] 2737    3
+
+
+```{r}
+# find number of svaba overlap with manta
+manta_svgr$svaba_overlaps=countBreakpointOverlaps(manta_svgr, svaba_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+
+# show the number
+# note overlap=2 is still one call overlapping
+as.data.frame(manta_svgr) %>% subset(svaba_overlaps != 2) %>% subset(select="svaba_overlaps") %>% sum() -> a
+as.data.frame(manta_svgr) %>% subset(svaba_overlaps == 2) %>% subset(select="svaba_overlaps") %>% sum()/2 -> b
+a+b
+```
+
+```{r, warning=F}
+# do the same for manta/truth and svaba/truth
+# manta/truth
+manta_svgr$truth_overlaps=countBreakpointOverlaps(manta_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# svaba/truth
+svaba_svgr$truth_overlaps=countBreakpointOverlaps(svaba_svgr, truth_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+# get number of calls matching between the two sets
+# note again overlap=2 is still one call overlapping
+# manta
+as.data.frame(manta_svgr) %>% subset(truth_overlaps != 2) %>% subset(select="truth_overlaps") %>% sum() -> mantru
+as.data.frame(manta_svgr) %>% subset(truth_overlaps == 2) %>% subset(select="truth_overlaps") %>% sum()/2 -> mantru2
+mantru+mantru2
+
+# svaba
+as.data.frame(svaba_svgr) %>% subset(truth_overlaps != 2) %>% subset(select="truth_overlaps") %>% sum() -> svatru
+as.data.frame(svaba_svgr) %>% subset(truth_overlaps == 2) %>% subset(select="truth_overlaps") %>% sum()/2 -> svatru2
+svatru+svatru2
+```
+
+```{r, warning=F}
+# intersect of all three sets
+# are those called by both callers and are in the truth set
+as.data.frame(manta_svgr) %>% subset(truth_overlaps != 0) %>% subset(svaba_overlaps !=0) %>% nrow()
+# this measure should be commutative (reciprocal?)
+svaba_svgr$manta_overlaps=countBreakpointOverlaps(svaba_svgr, manta_svgr, 
+                                              maxgap=200, sizemargin=0.25,
+                                              restrictMarginToSizeMultiple=0.5, countOnlyBest=TRUE)
+as.data.frame(svaba_svgr) %>% subset(truth_overlaps != 0) %>% subset(manta_overlaps !=0) %>% nrow()
+```
+

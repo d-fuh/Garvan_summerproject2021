@@ -1,0 +1,103 @@
+---
+title: "Short analysis on SV types detected in NA12878 and Exceptional Responders"
+output: html_notebook
+---
+# NA12878
+
+Use the script "SV_type.R" in the main folder (~/../NA12878_benchmark) to get the SV types detected by each caller from NA12878 into one data frame ("svt").
+
+That script is also replicated below:
+```{r Generate sv type data, include=F, eval=F}
+# This script imports SV type data from the BND converter (See SvABA_BND_annotation.R)
+# to svaba_svgr objects
+# and then analyse the type of SVs detected in each caller 
+# using NA12878 at different coverage levels
+
+setwd("~/GitRepo/summerproject2021/NA12878_benchmark/SvABA_processing")
+
+# BND from csv to svaba_svgr by 
+med.svaba.uniq=read.csv("med_svaba_converted.csv")
+ft.svaba.uniq=read.csv("50pc_converted.csv")
+large.svaba.uniq=read.csv("svaba_converted.csv")
+
+# svgr#elementMetadata$sourceID ~ csv$ID
+# svgr@elementMetadata$svtype ~ csv$SV_type
+
+med_svaba_svgr@elementMetadata$svtype[which(med_svaba_svgr@elementMetadata$sourceId == med.svaba.uniq$ID)]=med.svaba.uniq$SV_type
+
+ft_svaba_svgr@elementMetadata$svtype[which(ft_svaba_svgr@elementMetadata$sourceId == ft.svaba.uniq$ID)]=ft.svaba.uniq$SV_type
+
+svaba_svgr@elementMetadata$svtype[which(svaba_svgr@elementMetadata$sourceId == large.svaba.uniq$ID)]=large.svaba.uniq$SV_type
+
+# sv type
+dflarge=large_svgr@elementMetadata[, c("svtype", "Caller")]
+dfft=ft_svgr@elementMetadata[, c("svtype", "Caller")]
+dfmed=med_svgr@elementMetadata[, c("svtype", "Caller")]
+
+# cov
+dflarge$Cov="35X"
+dfft$Cov="18X"
+dfmed$Cov="6X"
+
+
+dflarge=as.data.frame(dflarge)
+dfft=as.data.frame(dfft)
+dfmed=as.data.frame(dfmed)
+
+# join
+plyr::join(dflarge, dfft, type="full") %>% plyr::join(dfmed, type="full") -> svt
+
+# plot
+ggplot(svt) + aes(x=svtype, fill=Caller) + geom_bar(position="dodge") + facet_wrap(~Cov) + theme_bw()
+ggsave("~/GitRepo/summerproject2021/NA12878_benchmark/Figures/SV_type_by_coverage.png")
+
+# reorder panel header level for PR plot
+svt$Cov <- factor(svt$Cov, levels = c("35X", "18X", "6X"))
+```
+
+
+```{r Plot SV type by caller}
+# plot
+ggplot(svt) + aes(x=svtype, fill=Caller) + geom_bar(position="dodge") + facet_wrap(~Cov, nrow=1) + theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust=1.2 ,vjust=1.2)) + ylab("Count") + xlab("Type of structural variant")
+ggsave("SV_type_by_caller.png")
+```
+
+```{r Plot SV type by coverage}
+# sv type by coverage
+ggplot(svt) + aes(x=svtype, fill=Cov) + geom_bar(position="dodge") + theme_bw() +
+  ylab("Count") + xlab("Type of structural variant") + 
+  paletteer::scale_fill_paletteer_d("LaCroixColoR::PommeBaya", name="Coverage")
+ggsave("SV_type_by_coverage.png")
+```
+
+# Exceptional Responders
+
+You'll need the data frame "ExRes_q", which is the qualified call set from the six exceptional responders' germline samples.
+
+The data were generated in "~/../Exceptional_responders/ExRes_benchmark.Rmd". We will import it here for your convenience:
+```{r Import ExRes variant data}
+ExRes_q=read_rds("~/GitRepo/summerproject2021/Exceptional_responders/ExRes_q.rds")
+```
+
+```{r Plot SV type in the Exceptional Responders Cohort}
+# SV type and length, but must wrap by caller (or else duplicate counts confound)
+ExRes_q %>% 
+  filter(!is.na(SV_length)) %>%
+  ggplot() + aes(x=abs(SV_length), color = SV_type) + 
+  geom_line(aes(y=..count..), stat="bin", size = 1.05) +
+  facet_wrap(~Caller) + 
+  theme_classic() + 
+  paletteer::scale_colour_paletteer_d("khroma::bright", name = "SV type") +
+  scale_x_log10(name = "SV size (log-scaled)", 
+                breaks = c(1, 20, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8), 
+                label = c("1 bp", "20 bp", "100 bp", "1 kb", "10 kb", "100 kb", "1 Mb", "10 Mb", "100 Mb")) +
+  scale_y_continuous(trans = "log10", 
+                name = "Counts (log-scaled)",
+                breaks= c(10, 10^2, 10^3, 10^4, 10^5), 
+                label = c("10", "100", "1k", "10k", "100k"))
+
+ggsave("SV_length_trend.png")
+```
+
+
