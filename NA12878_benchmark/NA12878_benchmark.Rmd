@@ -1,5 +1,5 @@
 ---
-title: "Benchmarking Structural Variant Callers using NA12878 WGS reference"
+title: "Benchmarking Structural Variant Callers using NA12878 WGS Data"
 author: 
   David Fuh, <br/>
   Summer Intern, <br/>
@@ -8,13 +8,13 @@ author:
   Sydney, NSW, Australia
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
-    toc: yes
   html_document:
     toc: yes
     toc_float:
       collapsed: yes
       smooth_scroll: yes
+  pdf_document:
+    toc: yes
 ---
 ```{r setup, include=FALSE, cache=FALSE}
 knitr::opts_chunk$set(
@@ -69,7 +69,7 @@ truth_svgr <- breakpointRanges(truth_vcf)
 
 # Importing VCF from GATK-SV & SvABA
 
-```{r caller vcf, warning=F}
+```{r caller vcf, warning=F, include=F}
 setwd("~/GitRepo/summerproject2021/NA12878_benchmark/VCF")
 # 35X
 delly_vcf <- readVcf("NA12878.delly.vcf", "hg38")
@@ -96,7 +96,7 @@ med_svaba_vcf <- readVcf("NA12878_med.svaba.vcf", "hg38")
 
 # VCF to svgr by genomicRanges
 
-```{r caller svgr, warning=F}
+```{r caller svgr, warning=F, include=F}
 # 35X
 delly_svgr <- breakpointRanges(delly_vcf)
 manta_svgr <- breakpointRanges(manta_vcf)
@@ -145,7 +145,7 @@ med_svaba_svgr=subset(med_svaba_svgr, med_svaba_svgr@elementMetadata[, 5] == "PA
 ```
 
 ## Assign caller info
-```{r Assigning callers to svgr, warning=F}
+```{r Assigning callers to svgr, warning=F, include=F}
 # 35X
 delly_svgr$Caller <- "Delly"
 manta_svgr$Caller <- "Manta"
@@ -181,7 +181,7 @@ Estimates*:
 *These numbers need to be confirmed by samtools etc. We only eyeballed the overall depth using our header_maprate_depth workflow on Terra.
 
 
-```{r Assigning coverage to svgr, warning=FALSE}
+```{r Assigning coverage to svgr, warning=FALSE, include=F}
 # 35X
 delly_svgr$Cov <- "35x"
 manta_svgr$Cov <- "35x"
