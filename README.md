@@ -9,4 +9,4 @@ In our main project, we benchmarked four structural variant callers: Three from 
 
 - Exceptional Responders Study (side-project; ongoing)
 
-The *exceptional responders* were six patients who had received different therapies for several types of tumours. Four of which has shown exceptional response to therapy. The project aim is to search for and analyse any special structural variants we may find in the germline samples in these patients, as opposed to the traditional approach using somatic ctDNA samples.
+The *exceptional responders* cohort consists of several patients who had received different therapies for several types of tumours. Four of which have shown exceptional response to therapy in a subset of the cohort (n=6). The project aim is to search for and analyse any special structural variants we may find in the germline samples in these patients, as opposed to the traditional approach using somatic ctDNA samples.
