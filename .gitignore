@@ -18,5 +18,7 @@ NA12878_benchmark/AnnotSV_vis_files/*.*
 # Exceptional responders
 Exceptional_responders/ExRes.csv
 Exceptional_responders/ExRes_q.rds
+Exceptional_responders/ExResVCF/*.*
+Exceptional_responders/Variant_samples_csv/*.*
 Exceptional_responders/AnnotSV_vis_files/*.*
 Exceptional_responders/Annotated_variant_set_per_ID/*.*
