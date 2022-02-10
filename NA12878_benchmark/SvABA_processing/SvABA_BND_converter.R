@@ -1,7 +1,18 @@
+# This workflow converts the BND notation from the original SvABA VCF output
+# to proper SV types according to their breakpoint orientation.
+
+# source:
+
+# **NOTE** Use SvABA_header_trimmer.Rmd first 
+# to trim the redundant columns out of the raw VCF file
+
+# **NOTE** the output from SvABA_header_trimmer.Rmd
+# needs to be decompressed first on MacOS
+# regardless of whether the input VCF was decompressed or not
+
 library(dplyr)
-# Import the svaba vcf file with redundant headers trimmed
-# Use SvABA_header_trimmer.R first if not
-svaba.vcf="~/Documents/GitHub/summerproject2021/NA12878_benchmark/SvABA_processing/SvABA_VCF_backup/NA12878.svaba.vcf"
+
+svaba.vcf="~/Dropbox/ExRes/ExResVCF/Svaba_backup/NA12878.svaba.vcf"
 
 cols <- colnames(read.table(pipe(paste0('grep -v "##" ', svaba.vcf,' | grep "#"| sed s/#//')), header = TRUE))
 cols <- sapply(cols, function(x) gsub("(mrkdp\\.)|(\\.bam)", "", x))
@@ -34,11 +45,9 @@ get_sv_type <- function(x){
 
 svaba_uniq$SV_type <- sapply(svaba_uniq$ID, get_sv_type)
 
-# write to new vcf
-# write.vcf from vcfR does not accept the object
-# double check if the output format is correct
-write.table(svaba_uniq, "svaba_converted.vcf")
+# write the converted object to csv
+# the sv type info can be extracted as a single column
+# then pasted to VCF/GR objects.
+write.csv(svaba_uniq, "NA12878_svaba_converted.csv")
 
-# as a more convenient backup
-# we can also export the sv type info in csv
-write.csv(svaba_uniq, "svaba_converted.csv")
+# can also write into VCF files directly?

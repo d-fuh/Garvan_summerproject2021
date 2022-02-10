@@ -2,56 +2,58 @@
 title: "SvABA output processing"
 output: html_notebook
 ---
-This is a workflow to process raw SvABA outputs (VCF) to prevent the header-column number mismatch error
+Below is a script to remove the three redundant columns in the raw VCF files from SvABA output.
 
-# 0. Download your VCF output from SvABA workflow (VCF)
-# 1. Bash
-```{bash}
-# grep the header element row
-grep "#CHROM" NA12878_small.svaba.sv.raw.vcf
+**IMPORTANT** Be sure to change the working directory to where the VCF file is located to prevent errors.
+
+
+# 1. Use Bash to rename the columns of interest
+```{bash Get column header}
+# this is the raw vcf file from svaba
+
+# copy the line after "FORMAT"
+# /cromwell_root/.../sample_name.bam
+
+grep "#CHROM" NA12878.svaba.sv.vcf
 ```
 
 
-```{bash}
-# replace old colnames with new
-## replace $long_name_to_be_replaced with $NewColName, usually sample name
-cat NA12878_small.svaba.sv.raw.vcf | awk '{gsub("FILTER\tINFO\tFORMAT\t/cromwell_root/gatk-test-data/wgs_bam/NA12878_24RG_hg38/NA12878_24RG_small.hg38.bam", "FILTER\tINFO\tFORMAT\tA\tB\tC\tNA12878_small")}1' > NA12878_small.svaba.sv.new.vcf
+```{bash Rename columns of interest}
+# ... tFORMAT\t/***PASTE HERE***...../(including)sample_name.bam"
+# change this: tA\tB\tC\t***sample_name*** > sample_name.sv.vcf
+# rename the output if you want to retain the original vcf file
+
+cat NA12878.svaba.sv.vcf | awk '{gsub("FILTER\tINFO\tFORMAT\t/cromwell_root/gatk-test-data/wgs_bam/NA12878_24RG_hg38/NA12878_24RG.hg38.bam", "FILTER\tINFO\tFORMAT\tA\tB\tC\tNA12878")}1' > NA12878.svaba.sv.vcf
 ```
 
-File names: Below are Bash-renamed VCF files
-
-- NA12878_small.svaba.sv.new.vcf
-- NA12878_med.svaba.sv.new.vcf
-- NA12878.svaba.sv.new.vcf
+The columns are renamed accordingly and the original VCF files overwritten.
 
 
-# 2. R
-```{r}
-# load the new, renamed VCF file
+# 2. Use R to remove redundant columns
+```{r Process vcf file in R}
+# the three columns have been renamed but not yet removed
 library(vcfR)
 
-to.be.cleaned.vcf <- read.vcfR("NA12878_small.svaba.sv.new.vcf")
+to.be.cleaned.vcf <- read.vcfR("NA12878.svaba.sv.vcf")
 
-# eliminate the 3 problematic columns
-dim(to.be.cleaned.vcf@gt[, c(2:4)])
+# remove the 3 redundant columns
+  #dim(to.be.cleaned.vcf@gt[, c(2:4)])
 to.be.cleaned.vcf@gt = to.be.cleaned.vcf@gt[, -c(2:4)]
-dim(to.be.cleaned.vcf@gt)
+  #dim(to.be.cleaned.vcf@gt)
 
-# write the now cleaned vcf object into new VCF file to be used for benchmarking
-write.vcf(to.be.cleaned.vcf, "NA12878_small.svaba.vcf.gz")
+# write the cleaned object to a new vcf file
+write.vcf(to.be.cleaned.vcf, "NA12878.svaba.vcf") ## note that the .sv was removed in the new file
 ```
 
+**IMPORTANT**
+Even if the original input VCF was decompressed, the resultant file needs to be decompressed again!
 
-**Note that the output file is compressed i.e. in vcf.gz format.**
+Rename output (the one without .sv) as *.vcf.gz and open to decompress (Worked on MacOS).
 
-
-```{bash}
-# decompress first
-
-```
-
-```{r}
+```{r After processed vcf is decompressed test read in}
 # test output file
+# should be able to load directly 
+# can also check total SV calls
 test.vcf <- read.vcfR("NA12878.svaba.vcf")
 ```
 

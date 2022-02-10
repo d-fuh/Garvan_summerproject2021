@@ -8,3 +8,6 @@ We compiled the following scripts as a pipeline to process SvABA output (VCF) in
 #### 2. Decompress the output from (1)
 #### 3. (Optional) Use SvABA_BND_converter to convert the sv type column (all BND) to proper SV types (INV/DEL/DUP-INS) based on breakpoint orientation
  
+The file with sv types converted are stored in ./Converted_csv_output as well as ../VCF
+
+Note that SvABA_further_annotation was not used in our benchmarking workflow and is optional. Source: https://github.com/walaj/svaba/blob/master/R/svaba-annotate.R
