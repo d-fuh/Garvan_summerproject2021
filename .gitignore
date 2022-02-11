@@ -20,3 +20,4 @@ Exceptional_responders/ExRes_q.rds
 Exceptional_responders/ExResVCF/**/*.*
 Exceptional_responders/Variant_samples_csv/*.*
 Exceptional_responders/Annotated_variant_set_per_ID/*.*
+Debriefing_takeaways.txt
